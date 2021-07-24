@@ -6,35 +6,81 @@ import (
 	"strings"
 )
 
-func (b *Bot) handleMessage(message *tgbotapi.Message) {
-	log.Printf("[%s] %s", message.From.UserName, message.Text)
-
+func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
 	msg.ReplyToMessageID = message.MessageID
 
-	b.bot.Send(msg)
+	_, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *Bot) handleCommand(message *tgbotapi.Message) error {
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда")
 	switch message.Command() {
 	case "start":
-		b.handleStartCommand(msg)
+		err := b.handleStartCommand(msg)
+		if err != nil {
+			return err
+		}
 
 	case "all":
-		b.handleAllCommand(msg)
+		err := b.handleAllCommand(msg)
+		if err != nil {
+			return err
+		}
 
 	default:
-		b.handleUnknownCommand(msg)
+		err := b.handleUnknownCommand(msg)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig) error {
+	keyboard, err := b.generateKeyboard()
 	msg.Text = "Hi"
-	_, err := b.bot.Send(msg)
-	return err
+	msg.ReplyMarkup = keyboard
+	message, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+	log.Println("Message sent: ", message)
+	return nil
+}
+
+func (b *Bot) generateKeyboard() (*tgbotapi.ReplyKeyboardMarkup, error) {
+	var buttons [][]tgbotapi.KeyboardButton
+	groups, err := b.db.GetAllGroupsSlice()
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(groups); i++ {
+		var row []tgbotapi.KeyboardButton
+		if i+3 < len(groups) {
+			row = tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButton(groups[i]),
+				tgbotapi.NewKeyboardButton(groups[i+1]),
+				tgbotapi.NewKeyboardButton(groups[i+2]),
+				tgbotapi.NewKeyboardButton(groups[i+3]),
+			)
+			i += 3
+		} else {
+			row = tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButton(groups[i]),
+			)
+		}
+		buttons = append(buttons, row)
+	}
+	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
+
+	return &keyboard, nil
 }
 
 func (b *Bot) handleAllCommand(msg tgbotapi.MessageConfig) error {

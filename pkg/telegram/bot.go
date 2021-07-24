@@ -68,19 +68,19 @@ func (b *Bot) initWebhook() error {
 
 func (b *Bot) handleUpdates(updates tgbotapi.UpdatesChannel) {
 	for update := range updates {
-		if update.Message == nil { // ignore any non-Message Updates
-			continue
-		}
+		log.Printf("update recieved: %+v\n", update)
 
-		if update.Message.IsCommand() {
-			err := b.handleCommand(update.Message)
-			if err != nil {
-				log.Fatal(err)
+		if update.Message != nil {
+			if update.Message.IsCommand() {
+				err := b.handleCommand(update.Message)
+				if err != nil {
+					log.Fatal(err)
+				}
+				continue
 			}
-			continue
-		}
 
-		b.handleMessage(update.Message)
+			b.handleMessage(update.Message)
+		}
 	}
 }
 

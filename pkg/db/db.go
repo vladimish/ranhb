@@ -46,3 +46,12 @@ func (d *DataBase) GetAllGroupsSlice() ([]string, error) {
 
 	return groups, nil
 }
+
+func (d *DataBase) AddUser(id int, group string) error {
+	query := fmt.Sprintf("INSERT INTO ranh.users (userId, primaryGroup) VALUES (%d, %s)", id, group)
+	_, err := d.db.Exec(query)
+	if err != nil {
+		return err
+	}
+	return nil
+}
