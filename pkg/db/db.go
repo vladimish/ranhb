@@ -27,24 +27,44 @@ func InitDBConncetion(login string, password string) (*sql.DB, error) {
 	return db, nil
 }
 
-func (d *DataBase) GetAllGroupsSlice() ([]string, error) {
-	var groups []string
-
-	rows, err := d.db.Query("SELECT DISTINCT `groups` FROM ranh.tt;")
-	if err != nil {
-		return groups, err
+// GetAllDistinctField Get all values of a specific field.
+//
+// Excepted arguments:
+//
+// 0 - name of the resulting field,
+//
+// 1 - name of the table,
+func (d *DataBase) GetAllDistinctField(args ...string) ([]string, error) {
+	if len(args) != 2 {
+		panic("Expected 1 argument\n " +
+			"0 - name of the resulting field,\n" +
+			"1 - name of the table,\n" +
+			"received: " + string(len(args)))
 	}
+
+	query := "SELECT DISTINCT `" + args[0] + "` FROM ranh." + args[1] + ";"
+	return d.getAllFieldTemplate(query)
+}
+
+func (d *DataBase) getAllFieldTemplate(query string) ([]string, error) {
+	rows, err := d.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []string
 	for rows.Next() {
 		var tempGroup string
 		err := rows.Scan(&tempGroup)
 		if err != nil {
-			return groups, err
+			return result, err
 		}
 
-		groups = append(groups, tempGroup)
+		result = append(result, tempGroup)
 	}
 
-	return groups, nil
+	return result, nil
 }
 
 func (d *DataBase) AddUser(id int, group string) error {

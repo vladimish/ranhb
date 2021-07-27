@@ -44,8 +44,8 @@ func (b *Bot) handleCommand(message *tgbotapi.Message) error {
 }
 
 func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig) error {
-	keyboard, err := b.generateKeyboard()
-	msg.Text = "Hi"
+	keyboard, err := b.generateKeyboard(b.db.GetAllDistinctField, "form", "fucks")
+	msg.Text = "Выберите форму обучения."
 	msg.ReplyMarkup = keyboard
 	message, err := b.bot.Send(msg)
 	if err != nil {
@@ -55,27 +55,33 @@ func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig) error {
 	return nil
 }
 
-func (b *Bot) generateKeyboard() (*tgbotapi.ReplyKeyboardMarkup, error) {
+type dataDrainer func(args ...string) ([]string, error)
+
+func (b *Bot) generateKeyboard(dd dataDrainer, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
 	var buttons [][]tgbotapi.KeyboardButton
-	groups, err := b.db.GetAllGroupsSlice()
+	data := make([][]string, 1)
+	var err error
+	data[0], err = dd(args...)
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < len(groups); i++ {
-		var row []tgbotapi.KeyboardButton
-		if i+3 < len(groups) {
-			row = tgbotapi.NewKeyboardButtonRow(
-				tgbotapi.NewKeyboardButton(groups[i]),
-				tgbotapi.NewKeyboardButton(groups[i+1]),
-				tgbotapi.NewKeyboardButton(groups[i+2]),
-				tgbotapi.NewKeyboardButton(groups[i+3]),
-			)
-			i += 3
-		} else {
-			row = tgbotapi.NewKeyboardButtonRow(
-				tgbotapi.NewKeyboardButton(groups[i]),
-			)
+
+	for len(data[0]) > 75 {
+		for i := range data {
+			data = append(data, data[i])
+			data[i] = data[i][:len(data[i])/2]
+			data[len(data)-1] = data[len(data)-1][len(data[i])/2:]
 		}
+	}
+
+	for i := 0; i < len(data); i++ {
+		var kbButtons []tgbotapi.KeyboardButton
+		for k := range data[i] {
+			kbButtons = append(kbButtons, tgbotapi.NewKeyboardButton(data[i][k]))
+		}
+		var row []tgbotapi.KeyboardButton
+		row = tgbotapi.NewKeyboardButtonRow(kbButtons...)
+
 		buttons = append(buttons, row)
 	}
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
@@ -84,7 +90,7 @@ func (b *Bot) generateKeyboard() (*tgbotapi.ReplyKeyboardMarkup, error) {
 }
 
 func (b *Bot) handleAllCommand(msg tgbotapi.MessageConfig) error {
-	groups, err := b.db.GetAllGroupsSlice()
+	groups, err := b.db.GetAllDistinctField("groups", "tt")
 	if err != nil {
 		return err
 	}
