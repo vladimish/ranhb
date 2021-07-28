@@ -13,6 +13,7 @@ type Config struct {
 	DbLogin    string
 	DbPassword string
 	TgKey      string
+	PageSize   int
 }
 
 var Cfg *Config

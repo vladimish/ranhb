@@ -1,19 +1,19 @@
 package telegram
 
 import (
-	"github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/telf01/ranhb/pkg/configurator"
-	"github.com/telf01/ranhb/pkg/db"
+	db2 "github.com/telf01/ranhb/pkg/db"
 	"log"
 	"net/http"
 )
 
 type Bot struct {
-	db  *db.DataBase
+	db  *db2.DataBase
 	bot *tgbotapi.BotAPI
 }
 
-func NewBot(bot *tgbotapi.BotAPI, db *db.DataBase) *Bot {
+func NewBot(bot *tgbotapi.BotAPI, db *db2.DataBase) *Bot {
 	return &Bot{bot: bot, db: db}
 }
 

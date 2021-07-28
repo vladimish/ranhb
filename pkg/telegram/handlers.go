@@ -1,16 +1,54 @@
 package telegram
 
 import (
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/telf01/ranhb/pkg/configurator"
+	"github.com/telf01/ranhb/pkg/users"
 	"log"
 	"strings"
 )
 
 func (b *Bot) handleMessage(message *tgbotapi.Message) error {
+	user, err := users.Get(message.Chat.ID, b.db)
+	if err != nil {
+		return err
+	}
+	if user.U == nil {
+		user.Init(message.Chat.ID, b.db)
+	}
+
+	switch user.U.LastAction {
+	case "start":
+		{
+			switch message.Text {
+			case "➡️️":
+				groups, err := b.db.GetAllDistinctField("groups", "tt", "0", "10000")
+				if err != nil {
+					return err
+				}
+				if user.U.LastActionValue >= len(groups) {
+					return b.sendKeyboard(message.Chat.ID, user, 0)
+				} else {
+					return b.sendKeyboard(message.Chat.ID, user, configurator.Cfg.PageSize)
+				}
+
+			case "⬅️":
+				if user.U.LastActionValue <= 0 {
+					return b.sendKeyboard(message.Chat.ID, user, 0)
+				} else {
+					return b.sendKeyboard(message.Chat.ID, user, -configurator.Cfg.PageSize)
+				}
+			default:
+				log.Println("fuck")
+			}
+		}
+	}
+
 	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
 	msg.ReplyToMessageID = message.MessageID
 
-	_, err := b.bot.Send(msg)
+	_, err = b.bot.Send(msg)
 	if err != nil {
 		return err
 	}
@@ -22,7 +60,7 @@ func (b *Bot) handleCommand(message *tgbotapi.Message) error {
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда")
 	switch message.Command() {
 	case "start":
-		err := b.handleStartCommand(msg)
+		err := b.handleStartCommand(msg, message.Chat.ID)
 		if err != nil {
 			return err
 		}
@@ -43,15 +81,42 @@ func (b *Bot) handleCommand(message *tgbotapi.Message) error {
 	return nil
 }
 
-func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig) error {
-	keyboard, err := b.generateKeyboard(b.db.GetAllDistinctField, "form", "fucks")
-	msg.Text = "Выберите форму обучения."
+func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig, id int64) error {
+	user, err := users.Get(id, b.db)
+	if err != nil {
+		return err
+	}
+	if user.U.Id == 0 {
+		user.Init(id, b.db)
+		user.U.LastAction = "start"
+		user.Save()
+	}
+
+	return b.sendKeyboard(msg.ChatID, user, configurator.Cfg.PageSize)
+}
+
+func (b *Bot) sendKeyboard(chatId int64, user *users.User, pageOffset int) error {
+	msg := tgbotapi.NewMessage(chatId, "Выберите форму обучения.")
+
+	user.U.LastActionValue += pageOffset
+	user.Save()
+
+	keyboard, err := b.generateKeyboard(b.db.GetAllDistinctField, "groups", "tt", fmt.Sprintf("%d", user.U.LastActionValue), fmt.Sprintf("%d", configurator.Cfg.PageSize))
+	if err != nil {
+		return err
+	}
+
 	msg.ReplyMarkup = keyboard
+	if user.U.LastActionValue == configurator.Cfg.PageSize {
+		msg.Text = "Выберите форму обучения."
+	}
 	message, err := b.bot.Send(msg)
+
 	if err != nil {
 		return err
 	}
 	log.Println("Message sent: ", message)
+
 	return nil
 }
 
@@ -59,31 +124,33 @@ type dataDrainer func(args ...string) ([]string, error)
 
 func (b *Bot) generateKeyboard(dd dataDrainer, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
 	var buttons [][]tgbotapi.KeyboardButton
-	data := make([][]string, 1)
-	var err error
-	data[0], err = dd(args...)
+	groups, err := dd(args...)
 	if err != nil {
 		return nil, err
 	}
 
-	for len(data[0]) > 75 {
-		for i := range data {
-			data = append(data, data[i])
-			data[i] = data[i][:len(data[i])/2]
-			data[len(data)-1] = data[len(data)-1][len(data[i])/2:]
-		}
-	}
-
-	for i := 0; i < len(data); i++ {
-		var kbButtons []tgbotapi.KeyboardButton
-		for k := range data[i] {
-			kbButtons = append(kbButtons, tgbotapi.NewKeyboardButton(data[i][k]))
-		}
+	for i := 0; i < len(groups); i++ {
 		var row []tgbotapi.KeyboardButton
-		row = tgbotapi.NewKeyboardButtonRow(kbButtons...)
-
+		if i+1 < len(groups) {
+			row = tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButton(groups[i]),
+				tgbotapi.NewKeyboardButton(groups[i+1]),
+			)
+			i += 1
+		} else {
+			row = tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButton(groups[i]),
+			)
+		}
 		buttons = append(buttons, row)
 	}
+
+	row := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton("⬅️"),
+		tgbotapi.NewKeyboardButton("➡️️"),
+	)
+	buttons = append(buttons, row)
+
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
 
 	return &keyboard, nil
