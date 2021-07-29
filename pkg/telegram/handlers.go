@@ -16,6 +16,7 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	}
 	if user.U == nil {
 		user.Init(message.Chat.ID, b.db)
+		user.U.LastActionValue = -configurator.Cfg.PageSize
 	}
 
 	switch user.U.LastAction {
@@ -86,10 +87,22 @@ func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig, id int64) error {
 	if err != nil {
 		return err
 	}
+	if user.U.LastAction != "start" {
+		user.U.LastActionValue = -configurator.Cfg.PageSize
+		user.U.LastAction = "start"
+		err := user.Save()
+		if err != nil {
+			return err
+		}
+	}
 	if user.U.Id == 0 {
 		user.Init(id, b.db)
 		user.U.LastAction = "start"
-		user.Save()
+		user.U.LastActionValue = -configurator.Cfg.PageSize
+		err := user.Save()
+		if err != nil {
+			return err
+		}
 	}
 
 	return b.sendKeyboard(msg.ChatID, user, configurator.Cfg.PageSize)
@@ -99,9 +112,12 @@ func (b *Bot) sendKeyboard(chatId int64, user *users.User, pageOffset int) error
 	msg := tgbotapi.NewMessage(chatId, "Выберите форму обучения.")
 
 	user.U.LastActionValue += pageOffset
-	user.Save()
+	err := user.Save()
+	if err != nil {
+		return err
+	}
 
-	keyboard, err := b.generateKeyboard(b.db.GetAllDistinctField, "groups", "tt", fmt.Sprintf("%d", user.U.LastActionValue), fmt.Sprintf("%d", configurator.Cfg.PageSize))
+	keyboard, err := b.generateKeyboard(b.db.GetAllDistinctField, user, "groups", "tt", fmt.Sprintf("%d", user.U.LastActionValue), fmt.Sprintf("%d", configurator.Cfg.PageSize))
 	if err != nil {
 		return err
 	}
@@ -122,7 +138,7 @@ func (b *Bot) sendKeyboard(chatId int64, user *users.User, pageOffset int) error
 
 type dataDrainer func(args ...string) ([]string, error)
 
-func (b *Bot) generateKeyboard(dd dataDrainer, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
+func (b *Bot) generateKeyboard(dd dataDrainer, u *users.User, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
 	var buttons [][]tgbotapi.KeyboardButton
 	groups, err := dd(args...)
 	if err != nil {
@@ -145,10 +161,21 @@ func (b *Bot) generateKeyboard(dd dataDrainer, args ...string) (*tgbotapi.ReplyK
 		buttons = append(buttons, row)
 	}
 
-	row := tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("⬅️"),
-		tgbotapi.NewKeyboardButton("➡️️"),
-	)
+	var row []tgbotapi.KeyboardButton
+	if len(groups) < 30 {
+		row = tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("⬅️"),
+		)
+	} else if u.U.LastActionValue <= 0 {
+		row = tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("➡️️"),
+		)
+	} else {
+		row = tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("⬅️"),
+			tgbotapi.NewKeyboardButton("➡️️"),
+		)
+	}
 	buttons = append(buttons, row)
 
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
