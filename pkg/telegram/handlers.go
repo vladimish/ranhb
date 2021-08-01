@@ -25,15 +25,17 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		if err != nil {
 			return err
 		}
+	case "menu":
+		err := b.handleMenuMessage(message, user)
+		if err != nil {
+			return err
+		}
 	}
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
-	msg.ReplyToMessageID = message.MessageID
+	return nil
+}
 
-	_, err = b.bot.Send(msg)
-	if err != nil {
-		return err
-	}
+func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) error {
 
 	return nil
 }
@@ -78,6 +80,11 @@ func (b *Bot) handleStartMessage(message *tgbotapi.Message, user *users.User) er
 				return err
 			}
 			log.Println("Message sent: ", m)
+
+			err = b.sendMenuKeyboard(message.Chat.ID, user)
+			if err != nil {
+				return err
+			}
 		} else {
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Группа не найдена.")
 			m, err := b.bot.Send(msg)
@@ -137,6 +144,27 @@ func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig, id int64) error {
 	return b.sendGroupsKeyboard(msg.ChatID, user, 0)
 }
 
+func (b *Bot) sendMenuKeyboard(chatId int64, user *users.User) error {
+	msg := tgbotapi.NewMessage(chatId, "Меню")
+	user.U.LastAction = "menu"
+	err := user.Save()
+	if err != nil {
+		return err
+	}
+
+	keyboard := b.generateMenuKeyboard()
+	msg.ReplyMarkup = keyboard
+
+	message, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Message sent: ", message)
+
+	return nil
+}
+
 func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int) error {
 	msg := tgbotapi.NewMessage(chatId, "Выберите форму обучения.")
 
@@ -146,7 +174,7 @@ func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int)
 		return err
 	}
 
-	keyboard, err := b.generateKeyboard(b.db.GetAllDistinctField, user, "groups", "tt", fmt.Sprintf("%d", user.U.LastActionValue), fmt.Sprintf("%d", configurator.Cfg.PageSize))
+	keyboard, err := b.generateGroupsKeyboard(b.db.GetAllDistinctField, user, "groups", "tt", fmt.Sprintf("%d", user.U.LastActionValue), fmt.Sprintf("%d", configurator.Cfg.PageSize))
 	if err != nil {
 		return err
 	}
@@ -165,9 +193,21 @@ func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int)
 	return nil
 }
 
+func (b *Bot) generateMenuKeyboard() *tgbotapi.ReplyKeyboardMarkup {
+	var buttons [][]tgbotapi.KeyboardButton
+	row := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton("Сегодня"),
+		tgbotapi.NewKeyboardButton("Завтра"),
+	)
+	buttons = append(buttons, row)
+	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
+
+	return &keyboard
+}
+
 type dataDrainer func(args ...string) ([]string, error)
 
-func (b *Bot) generateKeyboard(dd dataDrainer, u *users.User, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
+func (b *Bot) generateGroupsKeyboard(dd dataDrainer, u *users.User, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
 	var buttons [][]tgbotapi.KeyboardButton
 	groups, err := dd(args...)
 	if err != nil {
