@@ -21,28 +21,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 
 	switch user.U.LastAction {
 	case "start":
-		{
-			switch message.Text {
-			case "➡️️":
-				groups, err := b.db.GetAllDistinctField("groups", "tt", "0", "10000")
-				if err != nil {
-					return err
-				}
-				if user.U.LastActionValue >= len(groups) {
-					return b.sendKeyboard(message.Chat.ID, user, 0)
-				} else {
-					return b.sendKeyboard(message.Chat.ID, user, configurator.Cfg.PageSize)
-				}
-
-			case "⬅️":
-				if user.U.LastActionValue <= 0 {
-					return b.sendKeyboard(message.Chat.ID, user, 0)
-				} else {
-					return b.sendKeyboard(message.Chat.ID, user, -configurator.Cfg.PageSize)
-				}
-			default:
-				log.Println("fuck")
-			}
+		err := b.handleStartMessage(message, user)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -52,6 +33,59 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	_, err = b.bot.Send(msg)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (b *Bot) handleStartMessage(message *tgbotapi.Message, user *users.User) error {
+	switch message.Text {
+	case "➡️️":
+		groups, err := b.db.GetAllDistinctField("groups", "tt", "0", "10000")
+		if err != nil {
+			return err
+		}
+		if user.U.LastActionValue >= len(groups) {
+			return b.sendGroupsKeyboard(message.Chat.ID, user, 0)
+		} else {
+			return b.sendGroupsKeyboard(message.Chat.ID, user, configurator.Cfg.PageSize)
+		}
+
+	case "⬅️":
+		if user.U.LastActionValue <= 0 {
+			return b.sendGroupsKeyboard(message.Chat.ID, user, 0)
+		} else {
+			return b.sendGroupsKeyboard(message.Chat.ID, user, -configurator.Cfg.PageSize)
+		}
+	default:
+		groups, err := b.db.GetAllDistinctFieldWhere("groups", "tt", "0", "1", "groups", message.Text)
+		if err != nil {
+			return err
+		}
+
+		if len(groups) == 1 {
+			user.U.LastActionValue = 0
+			user.U.LastAction = "menu"
+			user.U.Group = groups[0]
+			err := user.Save()
+			if err != nil {
+				return err
+			}
+
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Ваша группа сохранена.")
+			m, err := b.bot.Send(msg)
+			if err != nil {
+				return err
+			}
+			log.Println("Message sent: ", m)
+		} else {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Группа не найдена.")
+			m, err := b.bot.Send(msg)
+			if err != nil {
+				return err
+			}
+			log.Println("Message sent: ", m)
+		}
 	}
 
 	return nil
@@ -87,28 +121,23 @@ func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig, id int64) error {
 	if err != nil {
 		return err
 	}
-	if user.U.LastAction != "start" {
-		user.U.LastActionValue = -configurator.Cfg.PageSize
-		user.U.LastAction = "start"
-		err := user.Save()
-		if err != nil {
-			return err
+
+	if user.U.Id == 0 || user.U.LastAction != "start" {
+		if user.U.Id == 0 {
+			user.Init(id, b.db)
 		}
-	}
-	if user.U.Id == 0 {
-		user.Init(id, b.db)
 		user.U.LastAction = "start"
-		user.U.LastActionValue = -configurator.Cfg.PageSize
+		user.U.LastActionValue = 0
 		err := user.Save()
 		if err != nil {
 			return err
 		}
 	}
 
-	return b.sendKeyboard(msg.ChatID, user, configurator.Cfg.PageSize)
+	return b.sendGroupsKeyboard(msg.ChatID, user, 0)
 }
 
-func (b *Bot) sendKeyboard(chatId int64, user *users.User, pageOffset int) error {
+func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int) error {
 	msg := tgbotapi.NewMessage(chatId, "Выберите форму обучения.")
 
 	user.U.LastActionValue += pageOffset
@@ -184,7 +213,7 @@ func (b *Bot) generateKeyboard(dd dataDrainer, u *users.User, args ...string) (*
 }
 
 func (b *Bot) handleAllCommand(msg tgbotapi.MessageConfig) error {
-	groups, err := b.db.GetAllDistinctField("groups", "tt")
+	groups, err := b.db.GetAllDistinctField("groups", "tt", "0", " 100")
 	if err != nil {
 		return err
 	}
