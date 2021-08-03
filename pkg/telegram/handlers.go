@@ -7,6 +7,7 @@ import (
 	"github.com/telf01/ranhb/pkg/users"
 	"log"
 	"strings"
+	"time"
 )
 
 func (b *Bot) handleMessage(message *tgbotapi.Message) error {
@@ -36,13 +37,25 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 }
 
 func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) error {
-
+	switch message.Text {
+	case configurator.Cfg.Consts.Today:
+		tts, err := b.db.GetSpecificTt(user.U.Group, time.Now().Day(), int(time.Now().Month()))
+		if err != nil {
+			return err
+		}
+		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("%+v", tts))
+		m, err := b.bot.Send(msg)
+		if err != nil {
+			return err
+		}
+		log.Println(m)
+	}
 	return nil
 }
 
 func (b *Bot) handleStartMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
-	case "➡️️":
+	case configurator.Cfg.Consts.Right:
 		groups, err := b.db.GetAllDistinctField("groups", "tt", "0", "10000")
 		if err != nil {
 			return err
@@ -53,7 +66,7 @@ func (b *Bot) handleStartMessage(message *tgbotapi.Message, user *users.User) er
 			return b.sendGroupsKeyboard(message.Chat.ID, user, configurator.Cfg.PageSize)
 		}
 
-	case "⬅️":
+	case configurator.Cfg.Consts.Left:
 		if user.U.LastActionValue <= 0 {
 			return b.sendGroupsKeyboard(message.Chat.ID, user, 0)
 		} else {
@@ -196,8 +209,8 @@ func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int)
 func (b *Bot) generateMenuKeyboard() *tgbotapi.ReplyKeyboardMarkup {
 	var buttons [][]tgbotapi.KeyboardButton
 	row := tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("Сегодня"),
-		tgbotapi.NewKeyboardButton("Завтра"),
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Today),
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Tomorrow),
 	)
 	buttons = append(buttons, row)
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
@@ -231,18 +244,18 @@ func (b *Bot) generateGroupsKeyboard(dd dataDrainer, u *users.User, args ...stri
 	}
 
 	var row []tgbotapi.KeyboardButton
-	if len(groups) < 30 {
+	if len(groups) < configurator.Cfg.PageSize {
 		row = tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("⬅️"),
+			tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
 		)
 	} else if u.U.LastActionValue <= 0 {
 		row = tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("➡️️"),
+			tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Right),
 		)
 	} else {
 		row = tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("⬅️"),
-			tgbotapi.NewKeyboardButton("➡️️"),
+			tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
+			tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Right),
 		)
 	}
 	buttons = append(buttons, row)

@@ -3,5 +3,12 @@
   "Port": "8443",
   "DbLogin": "",
   "DbPassword": "",
-  "TgKey": ""
+  "TgKey": "",
+  "PageSize": 30,
+  "Consts": {
+    "Right": "➡",
+    "Left": "⬅",
+    "Today": "Сегодня",
+    "Tomorrow": "Завтра"
+  }
 }

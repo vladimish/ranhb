@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/telf01/ranhb/pkg/db/models"
 	"log"
 )
 
@@ -62,6 +63,35 @@ func (d *DataBase) GetAllDistinctFieldWhere(args ...string) ([]string, error) {
 	return d.getAllFieldTemplate(query)
 }
 
+func (d *DataBase) GetSpecificTt(group string, day int, month int) ([]models.TT, error) {
+	query := fmt.Sprintf("SELECT * FROM ranh.tt WHERE `groups`='%s' AND `day`='%d' AND `month`='%d';", group, day, month)
+	rows, err := d.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
+	var r models.TT
+	var id int
+
+	var result []models.TT
+
+	for rows.Next() {
+		err := rows.Scan(&id, &r.Day, &r.Month, &r.Day_of_week, &r.Time, &r.Amount, &r.Groups, &r.Subject_type, &r.Subject, &r.Rank, &r.Teacher, &r.Classroom, &r.Fuck_key, &r.Subgroup)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+
+	return result, nil
+}
+
 func (d *DataBase) getAllFieldTemplate(query string) ([]string, error) {
 	rows, err := d.db.Query(query)
 	if err != nil {
@@ -76,13 +106,13 @@ func (d *DataBase) getAllFieldTemplate(query string) ([]string, error) {
 
 	var result []string
 	for rows.Next() {
-		var tempGroup string
-		err := rows.Scan(&tempGroup)
+		var field string
+		err := rows.Scan(&field)
 		if err != nil {
 			return result, err
 		}
 
-		result = append(result, tempGroup)
+		result = append(result, field)
 	}
 
 	return result, nil
