@@ -10,6 +10,74 @@ import (
 	"time"
 )
 
+func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
+	switch query.Data {
+	case "<":
+		err := b.handleDayCallback(query, false)
+		if err != nil {
+			return err
+		}
+	case ">":
+		err := b.handleDayCallback(query, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) error {
+	day, month, err := b.db.GetCallback(query.Message.Chat.ID, query.Message.MessageID)
+	if err != nil {
+		return err
+	}
+	cbcfg := tgbotapi.NewCallback(query.ID, "OK")
+	resp, err := b.bot.AnswerCallbackQuery(cbcfg)
+	if err != nil {
+		return err
+	}
+	log.Println(resp)
+
+	user, err := users.Get(query.Message.Chat.ID, b.db)
+	if err != nil {
+		return err
+	}
+
+	date := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone("UTC+3", 0))
+	if direction {
+		date = date.Add(24 * time.Hour)
+	} else {
+		date = date.Add(-24 * time.Hour)
+	}
+	tts, err := b.db.GetSpecificTt(user.U.Group, date.Day(), int(date.Month()))
+	if err != nil {
+		return err
+	}
+
+	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fmt.Sprintf("%+v", tts))
+	m, err := b.bot.Send(nmsg)
+	if err != nil {
+		return err
+	}
+	log.Println(m)
+
+	keyboard, err := b.buildDayKeyboard(date)
+	nmarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *keyboard)
+	m, err = b.bot.Send(nmarkup)
+	if err != nil {
+		return err
+	}
+	log.Println(m)
+
+	err = b.db.UpdateCallback(m.Chat.ID, m.MessageID, date.Day(), int(date.Month()))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	user, err := users.Get(message.Chat.ID, b.db)
 	if err != nil {
@@ -39,18 +107,56 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
 	case configurator.Cfg.Consts.Today:
-		tts, err := b.db.GetSpecificTt(user.U.Group, time.Now().Day(), int(time.Now().Month()))
+		err := b.generateCallbackMessage(message, user, time.Now())
 		if err != nil {
 			return err
 		}
-		msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("%+v", tts))
-		m, err := b.bot.Send(msg)
+	case configurator.Cfg.Consts.Tomorrow:
+		err := b.generateCallbackMessage(message, user, time.Now().Add(24*time.Hour))
 		if err != nil {
 			return err
 		}
-		log.Println(m)
 	}
 	return nil
+}
+
+func (b *Bot) generateCallbackMessage(message *tgbotapi.Message, user *users.User, date time.Time) error {
+	tts, err := b.db.GetSpecificTt(user.U.Group, date.Day(), int(date.Month()))
+	if err != nil {
+		return err
+	}
+
+	keyboard, err := b.buildDayKeyboard(date)
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("%+v", tts))
+	msg.ReplyMarkup = keyboard
+
+	m, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+
+	err = b.db.SaveCallback(message.Chat.ID, m.MessageID, date.Day(), int(date.Month()))
+	if err != nil {
+		return err
+	}
+
+	log.Println(m)
+	return nil
+}
+
+func (b *Bot) buildDayKeyboard(date time.Time) (*tgbotapi.InlineKeyboardMarkup, error) {
+	yesterday := fmt.Sprintf("%02d.%02d", date.Add(-24*time.Hour).Day(), date.Add(-24*time.Hour).Month())
+	tomorrow := fmt.Sprintf("%02d.%02d", date.Add(24*time.Hour).Day(), date.Add(24*time.Hour).Month())
+
+	ttKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.Left+" "+yesterday, "<"),
+			tgbotapi.NewInlineKeyboardButtonData(tomorrow+" "+configurator.Cfg.Consts.Right, ">"),
+		),
+	)
+
+	return &ttKeyboard, nil
 }
 
 func (b *Bot) handleStartMessage(message *tgbotapi.Message, user *users.User) error {

@@ -83,6 +83,13 @@ func (b *Bot) handleUpdates(updates tgbotapi.UpdatesChannel) {
 			if err != nil {
 				log.Println(err)
 			}
+		} else if update.CallbackQuery != nil {
+			err := b.handleCallback(update.CallbackQuery)
+			if err != nil {
+				log.Println(err)
+			}
+
+			continue
 		}
 	}
 }
