@@ -4,8 +4,10 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/telf01/ranhb/pkg/configurator"
+	"github.com/telf01/ranhb/pkg/db/models"
 	"github.com/telf01/ranhb/pkg/users"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -55,7 +57,13 @@ func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) e
 		return err
 	}
 
-	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fmt.Sprintf("%+v", tts))
+	msg, err := b.buildTtMessage(tts)
+	if err != nil {
+		return err
+	}
+
+	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fmt.Sprintf("%+v", msg))
+	nmsg.ParseMode = "HTML"
 	m, err := b.bot.Send(nmsg)
 	if err != nil {
 		return err
@@ -76,6 +84,40 @@ func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) e
 	}
 
 	return nil
+}
+
+func (b *Bot) buildTtMessage(tt []models.TT) (string, error) {
+	str := ""
+	res := make(map[int][]string, 0)
+	for t := range tt {
+		dday, err := strconv.Atoi(tt[t].Day)
+		if err != nil {
+			return "", err
+		}
+		dmonth, err := strconv.Atoi(tt[t].Month)
+		if err != nil {
+			return "", err
+		}
+
+		weekdayNumber, err := strconv.Atoi(tt[t].Day_of_week)
+		if err != nil {
+			return "", err
+		}
+		weekday := time.Weekday(weekdayNumber)
+
+		if len(res[dday*100+dmonth]) == 0 {
+			res[dday*100+dmonth] = []string{}
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s %02d.%02d\n", weekday, dday, dmonth))
+		}
+
+		res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n <b>%s</b>\n  Преподаватель: %s\nАудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
+
+		for i := range res {
+			str += strings.Join(res[i], "\n")
+		}
+	}
+
+	return str, nil
 }
 
 func (b *Bot) handleMessage(message *tgbotapi.Message) error {
@@ -130,6 +172,7 @@ func (b *Bot) generateCallbackMessage(message *tgbotapi.Message, user *users.Use
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("%+v", tts))
 	msg.ReplyMarkup = keyboard
+	msg.ParseMode = "HTML"
 
 	m, err := b.bot.Send(msg)
 	if err != nil {
