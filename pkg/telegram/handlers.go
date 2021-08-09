@@ -6,6 +6,7 @@ import (
 	"github.com/telf01/ranhb/pkg/configurator"
 	"github.com/telf01/ranhb/pkg/db/models"
 	"github.com/telf01/ranhb/pkg/users"
+	"github.com/telf01/ranhb/pkg/utils/date"
 	"log"
 	"strconv"
 	"strings"
@@ -46,13 +47,13 @@ func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) e
 		return err
 	}
 
-	date := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone("UTC+3", 0))
+	d := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone("UTC+3", 0))
 	if direction {
-		date = date.Add(24 * time.Hour)
+		d = d.Add(24 * time.Hour)
 	} else {
-		date = date.Add(-24 * time.Hour)
+		d = d.Add(-24 * time.Hour)
 	}
-	tts, err := b.db.GetSpecificTt(user.U.Group, date.Day(), int(date.Month()))
+	tts, err := b.db.GetSpecificTt(user.U.Group, d.Day(), int(d.Month()))
 	if err != nil {
 		return err
 	}
@@ -70,7 +71,11 @@ func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) e
 	}
 	log.Println(m)
 
-	keyboard, err := b.buildDayKeyboard(date)
+	keyboard, err := b.buildDayKeyboard(d)
+	if err != nil {
+		return err
+	}
+
 	nmarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *keyboard)
 	m, err = b.bot.Send(nmarkup)
 	if err != nil {
@@ -78,7 +83,7 @@ func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) e
 	}
 	log.Println(m)
 
-	err = b.db.UpdateCallback(m.Chat.ID, m.MessageID, date.Day(), int(date.Month()))
+	err = b.db.UpdateCallback(m.Chat.ID, m.MessageID, d.Day(), int(d.Month()))
 	if err != nil {
 		return err
 	}
@@ -103,18 +108,28 @@ func (b *Bot) buildTtMessage(tt []models.TT) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		weekday := time.Weekday(weekdayNumber)
+		weekday := date.IntToWeekday(weekdayNumber)
 
 		if len(res[dday*100+dmonth]) == 0 {
 			res[dday*100+dmonth] = []string{}
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("Группа: %s\n", tt[t].Groups))
 			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s %02d.%02d\n", weekday, dday, dmonth))
 		}
 
-		res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n <b>%s</b>\n  Преподаватель: %s\nАудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
-
-		for i := range res {
-			str += strings.Join(res[i], "\n")
+		res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>%s</b>\nПреподаватель: %s\nАудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
+		if tt[t].Subgroup != "" {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("Подгруппа: %s\n", tt[t].Subgroup))
+		} else {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], "\n")
 		}
+	}
+
+	for i := range res {
+		str += strings.Join(res[i], "\n")
+	}
+
+	if len(tt) == 0 {
+		str = "Занятий нет."
 	}
 
 	return str, nil
@@ -170,7 +185,12 @@ func (b *Bot) generateCallbackMessage(message *tgbotapi.Message, user *users.Use
 
 	keyboard, err := b.buildDayKeyboard(date)
 
-	msg := tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("%+v", tts))
+	msgString, err := b.buildTtMessage(tts)
+	if err != nil {
+		return err
+	}
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, msgString)
 	msg.ReplyMarkup = keyboard
 	msg.ParseMode = "HTML"
 
