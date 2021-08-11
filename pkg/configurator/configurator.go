@@ -8,10 +8,14 @@ import (
 )
 
 type Constants struct {
-	Right    string
-	Left     string
-	Today    string
-	Tomorrow string
+	Right     string
+	Left      string
+	VeryRight string
+	VeryLeft  string
+	Today     string
+	Tomorrow  string
+	ThisWeek  string
+	NextWeek  string
 }
 
 type Config struct {

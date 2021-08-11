@@ -4,11 +4,15 @@
   "DbLogin": "",
   "DbPassword": "",
   "TgKey": "",
-  "PageSize": 30,
+  "PageSize": 50,
   "Consts": {
     "Right": "➡",
     "Left": "⬅",
+    "VeryRight": "⏩",
+    "VeryLeft": "⏪",
     "Today": "Сегодня",
-    "Tomorrow": "Завтра"
+    "Tomorrow": "Завтра",
+    "ThisWeek": "Эта неделя",
+    "NextWeek": "Следующая неделя"
   }
 }

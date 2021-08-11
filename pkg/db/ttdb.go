@@ -82,7 +82,12 @@ func (d *DataBase) GetSpecificTt(group string, day int, month int) ([]models.TT,
 	var result []models.TT
 
 	for rows.Next() {
-		err := rows.Scan(&id, &r.Day, &r.Month, &r.Day_of_week, &r.Time, &r.Amount, &r.Groups, &r.Subject_type, &r.Subject, &r.Rank, &r.Teacher, &r.Classroom, &r.Fuck_key, &r.Subgroup)
+		err := rows.Scan(&id, &r.Day, &r.Month, &r.Day_of_week, &r.Time, &r.Amount, &r.Groups, &r.Subject_type, &r.Subject, &r.Rank, &r.Classroom, &r.Teacher, &r.Fuck_key, &r.Subgroup)
+		if err != nil {
+			return nil, err
+		}
+
+		err = d.db.QueryRow(fmt.Sprintf("SELECT teacher FROM ranh.teachers WHERE `id`=%s;", r.Teacher)).Scan(&r.Teacher)
 		if err != nil {
 			return nil, err
 		}

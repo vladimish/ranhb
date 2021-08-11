@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"errors"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/telf01/ranhb/pkg/configurator"
@@ -13,24 +14,40 @@ import (
 	"time"
 )
 
+var InvalidCallbackErr = errors.New("INVALID CALLBACK")
+
 func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
-	switch query.Data {
-	case "<":
-		err := b.handleDayCallback(query, false)
-		if err != nil {
-			return err
+	queryParts := strings.Split(query.Data, "/")
+	if len(queryParts) == 2 {
+		switch {
+		case queryParts[0] == "day":
+			err := b.handleDayCallback(query, queryParts[1])
+			if err != nil {
+				return err
+			}
+
+		case queryParts[0] == "week":
+			err := b.handleWeekCallback(query, queryParts[1])
+			if err != nil {
+				return err
+			}
+
+		default:
+			return InvalidCallbackErr
 		}
-	case ">":
-		err := b.handleDayCallback(query, true)
-		if err != nil {
-			return err
-		}
+	} else {
+		return InvalidCallbackErr
 	}
 
 	return nil
 }
 
-func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) error {
+func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, queryData string) error {
+	days, err := strconv.Atoi(queryData)
+	if err != nil {
+		return err
+	}
+
 	day, month, err := b.db.GetCallback(query.Message.Chat.ID, query.Message.MessageID)
 	if err != nil {
 		return err
@@ -48,20 +65,18 @@ func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) e
 	}
 
 	d := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone("UTC+3", 0))
-	if direction {
-		d = d.Add(24 * time.Hour)
-	} else {
-		d = d.Add(-24 * time.Hour)
-	}
+	d = d.AddDate(0, 0, days)
+
 	tts, err := b.db.GetSpecificTt(user.U.Group, d.Day(), int(d.Month()))
 	if err != nil {
 		return err
 	}
 
-	msg, err := b.buildTtMessage(tts)
+	msg, err := b.buildTtMessage(tts, false)
 	if err != nil {
 		return err
 	}
+	msg = "Группа: " + user.U.Group + "\n" + msg
 
 	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fmt.Sprintf("%+v", msg))
 	nmsg.ParseMode = "HTML"
@@ -91,7 +106,79 @@ func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, direction bool) e
 	return nil
 }
 
-func (b *Bot) buildTtMessage(tt []models.TT) (string, error) {
+func (b *Bot) handleWeekCallback(query *tgbotapi.CallbackQuery, queryData string) error {
+	daysToSkip, err := strconv.Atoi(queryData)
+	if err != nil {
+		return err
+	}
+
+	day, month, err := b.db.GetCallback(query.Message.Chat.ID, query.Message.MessageID)
+	if err != nil {
+		return err
+	}
+
+	user, err := users.Get(query.Message.Chat.ID, b.db)
+	if err != nil {
+		return err
+	}
+
+	d := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone("UTC+3", 0))
+	d = d.AddDate(0, 0, daysToSkip)
+	startTime, endTime := b.getWeekInterval(d)
+
+	fullMsgString := user.U.Group + "\n"
+
+	for i := startTime; i != endTime; i = i.AddDate(0, 0, 1) {
+		tts, err := b.db.GetSpecificTt(user.U.Group, i.Day(), int(i.Month()))
+		if err != nil {
+			return err
+		}
+
+		msgString, err := b.buildTtMessage(tts, true)
+		if err != nil {
+			return err
+		}
+
+		fullMsgString += msgString
+	}
+
+	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fullMsgString)
+	nmsg.ParseMode = "HTML"
+	m, err := b.bot.Send(nmsg)
+	if err != nil {
+		return err
+	}
+	log.Println(m)
+
+	// Add keyboard to edited message.
+	keyboard, err := b.buildWeekKeyboard(d)
+	if err != nil {
+		return err
+	}
+	nmarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *keyboard)
+	m, err = b.bot.Send(nmarkup)
+	if err != nil {
+		return err
+	}
+	log.Println(m)
+
+	err = b.db.UpdateCallback(m.Chat.ID, m.MessageID, d.Day(), int(d.Month()))
+	if err != nil {
+		return err
+	}
+
+	// Answer to callback
+	cbcfg := tgbotapi.NewCallback(query.ID, "OK")
+	resp, err := b.bot.AnswerCallbackQuery(cbcfg)
+	if err != nil {
+		return err
+	}
+	log.Println(resp)
+
+	return nil
+}
+
+func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
 	str := ""
 	res := make(map[int][]string, 0)
 	for t := range tt {
@@ -112,23 +199,22 @@ func (b *Bot) buildTtMessage(tt []models.TT) (string, error) {
 
 		if len(res[dday*100+dmonth]) == 0 {
 			res[dday*100+dmonth] = []string{}
-			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("Группа: %s\n", tt[t].Groups))
-			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s %02d.%02d\n", weekday, dday, dmonth))
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("<u>%s %02d.%02d</u>\n\n", weekday, dday, dmonth))
 		}
 
-		res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>%s</b>\nПреподаватель: %s\nАудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
+		res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>    %s</b>\n    Преподаватель: %s\n    Аудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
 		if tt[t].Subgroup != "" {
-			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("Подгруппа: %s\n", tt[t].Subgroup))
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("\n    Подгруппа: %s\n\n", tt[t].Subgroup))
 		} else {
-			res[dday*100+dmonth] = append(res[dday*100+dmonth], "\n")
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], "\n\n")
 		}
 	}
 
 	for i := range res {
-		str += strings.Join(res[i], "\n")
+		str += strings.Join(res[i], "")
 	}
 
-	if len(tt) == 0 {
+	if len(tt) == 0 && !isMultiday {
 		str = "Занятий нет."
 	}
 
@@ -169,7 +255,19 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 			return err
 		}
 	case configurator.Cfg.Consts.Tomorrow:
-		err := b.generateCallbackMessage(message, user, time.Now().Add(24*time.Hour))
+		err := b.generateCallbackMessage(message, user, time.Now().AddDate(0, 0, 1))
+		if err != nil {
+			return err
+		}
+	case configurator.Cfg.Consts.ThisWeek:
+		startTime, endTime := b.getWeekInterval(time.Now())
+		err := b.generateBigCallbackMessage(message, user, startTime, endTime, time.Now())
+		if err != nil {
+			return err
+		}
+	case configurator.Cfg.Consts.NextWeek:
+		startTime, endTime := b.getWeekInterval(time.Now().AddDate(0, 0, 7))
+		err := b.generateBigCallbackMessage(message, user, startTime, endTime, time.Now().AddDate(0, 0, 7))
 		if err != nil {
 			return err
 		}
@@ -184,11 +282,15 @@ func (b *Bot) generateCallbackMessage(message *tgbotapi.Message, user *users.Use
 	}
 
 	keyboard, err := b.buildDayKeyboard(date)
-
-	msgString, err := b.buildTtMessage(tts)
 	if err != nil {
 		return err
 	}
+
+	msgString, err := b.buildTtMessage(tts, false)
+	if err != nil {
+		return err
+	}
+	msgString = "Группа: " + user.U.Group + "\n" + msgString
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, msgString)
 	msg.ReplyMarkup = keyboard
@@ -208,14 +310,86 @@ func (b *Bot) generateCallbackMessage(message *tgbotapi.Message, user *users.Use
 	return nil
 }
 
+func (b *Bot) generateBigCallbackMessage(message *tgbotapi.Message, user *users.User, startTime time.Time, endTime time.Time, exactTime time.Time) error {
+	fullMsgString := user.U.Group + "\n"
+
+	for i := startTime; i != endTime; i = i.AddDate(0, 0, 1) {
+		tts, err := b.db.GetSpecificTt(user.U.Group, i.Day(), int(i.Month()))
+		if err != nil {
+			return err
+		}
+
+		msgString, err := b.buildTtMessage(tts, true)
+		if err != nil {
+			return err
+		}
+
+		fullMsgString += msgString
+	}
+
+	keyboard, err := b.buildWeekKeyboard(exactTime)
+	if err != nil {
+		return err
+	}
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, fullMsgString)
+	msg.ReplyMarkup = keyboard
+	msg.ParseMode = "HTML"
+
+	m, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+
+	err = b.db.SaveCallback(message.Chat.ID, m.MessageID, exactTime.Day(), int(exactTime.Month()))
+	if err != nil {
+		return err
+	}
+
+	log.Println(m)
+
+	return nil
+}
+
+func (b *Bot) getWeekInterval(d time.Time) (startTime time.Time, endTime time.Time) {
+	for d.Weekday() != time.Monday {
+		d = d.AddDate(0, 0, -1)
+	}
+	startTime = d
+	endTime = startTime.Add(6 * 24 * time.Hour)
+
+	return startTime, endTime
+}
+
 func (b *Bot) buildDayKeyboard(date time.Time) (*tgbotapi.InlineKeyboardMarkup, error) {
 	yesterday := fmt.Sprintf("%02d.%02d", date.Add(-24*time.Hour).Day(), date.Add(-24*time.Hour).Month())
 	tomorrow := fmt.Sprintf("%02d.%02d", date.Add(24*time.Hour).Day(), date.Add(24*time.Hour).Month())
 
+	oldYesterday := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, -7).Day(), date.Add(-24*time.Hour).Month())
+	newTomorrow := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, 7).Day(), date.Add(-24*time.Hour).Month())
+
 	ttKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.Left+" "+yesterday, "<"),
-			tgbotapi.NewInlineKeyboardButtonData(tomorrow+" "+configurator.Cfg.Consts.Right, ">"),
+			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.Left+" "+yesterday, "day/-1"),
+			tgbotapi.NewInlineKeyboardButtonData(tomorrow+" "+configurator.Cfg.Consts.Right, "day/1"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.VeryLeft+" "+oldYesterday, "day/-7"),
+			tgbotapi.NewInlineKeyboardButtonData(newTomorrow+" "+configurator.Cfg.Consts.VeryRight, "day/7"),
+		),
+	)
+
+	return &ttKeyboard, nil
+}
+
+func (b *Bot) buildWeekKeyboard(date time.Time) (*tgbotapi.InlineKeyboardMarkup, error) {
+	oldYesterday := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, -7).Day(), date.AddDate(0, 0, -7).Month())
+	newTomorrow := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, 7).Day(), date.AddDate(0, 0, 7).Month())
+
+	ttKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.VeryLeft+" "+oldYesterday, "week/-7"),
+			tgbotapi.NewInlineKeyboardButtonData(newTomorrow+" "+configurator.Cfg.Consts.VeryRight, "week/7"),
 		),
 	)
 
@@ -347,6 +521,23 @@ func (b *Bot) sendMenuKeyboard(chatId int64, user *users.User) error {
 	return nil
 }
 
+func (b *Bot) generateMenuKeyboard() *tgbotapi.ReplyKeyboardMarkup {
+	var buttons [][]tgbotapi.KeyboardButton
+	row1 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Today),
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Tomorrow),
+	)
+	row2 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.ThisWeek),
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.NextWeek),
+	)
+	buttons = append(buttons, row1)
+	buttons = append(buttons, row2)
+	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
+
+	return &keyboard
+}
+
 func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int) error {
 	msg := tgbotapi.NewMessage(chatId, "Выберите форму обучения.")
 
@@ -373,18 +564,6 @@ func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int)
 	log.Println("Message sent: ", message)
 
 	return nil
-}
-
-func (b *Bot) generateMenuKeyboard() *tgbotapi.ReplyKeyboardMarkup {
-	var buttons [][]tgbotapi.KeyboardButton
-	row := tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Today),
-		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Tomorrow),
-	)
-	buttons = append(buttons, row)
-	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
-
-	return &keyboard
 }
 
 type dataDrainer func(args ...string) ([]string, error)
