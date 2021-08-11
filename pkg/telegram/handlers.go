@@ -261,24 +261,26 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
 	case configurator.Cfg.Consts.Today:
-		err := b.generateCallbackMessage(message, user, time.Now())
+		t := time.Now()
+		err := b.generateTtCallbackMessage(message, user, t, t, t)
 		if err != nil {
 			return err
 		}
 	case configurator.Cfg.Consts.Tomorrow:
-		err := b.generateCallbackMessage(message, user, time.Now().AddDate(0, 0, 1))
+		t := time.Now().AddDate(0, 0, 1)
+		err := b.generateTtCallbackMessage(message, user, t, t, t)
 		if err != nil {
 			return err
 		}
 	case configurator.Cfg.Consts.ThisWeek:
 		startTime, endTime := b.getWeekInterval(time.Now())
-		err := b.generateBigCallbackMessage(message, user, startTime, endTime, time.Now())
+		err := b.generateTtCallbackMessage(message, user, startTime, endTime, time.Now())
 		if err != nil {
 			return err
 		}
 	case configurator.Cfg.Consts.NextWeek:
 		startTime, endTime := b.getWeekInterval(time.Now().AddDate(0, 0, 7))
-		err := b.generateBigCallbackMessage(message, user, startTime, endTime, time.Now().AddDate(0, 0, 7))
+		err := b.generateTtCallbackMessage(message, user, startTime, endTime, time.Now().AddDate(0, 0, 7))
 		if err != nil {
 			return err
 		}
@@ -286,45 +288,30 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 	return nil
 }
 
-func (b *Bot) generateCallbackMessage(message *tgbotapi.Message, user *users.User, date time.Time) error {
-	tts, err := b.db.GetSpecificTt(user.U.Group, date.Day(), int(date.Month()))
-	if err != nil {
-		return err
-	}
-
-	keyboard, err := b.buildDayKeyboard(date)
-	if err != nil {
-		return err
-	}
-
-	msgString, err := b.buildTtMessage(tts, false)
-	if err != nil {
-		return err
-	}
-	msgString = "Группа: " + user.U.Group + "\n" + msgString
-
-	msg := tgbotapi.NewMessage(message.Chat.ID, msgString)
-	msg.ReplyMarkup = keyboard
-	msg.ParseMode = "HTML"
-
-	m, err := b.bot.Send(msg)
-	if err != nil {
-		return err
-	}
-
-	err = b.db.SaveCallback(message.Chat.ID, m.MessageID, date.Day(), int(date.Month()))
-	if err != nil {
-		return err
-	}
-
-	log.Println(m)
-	return nil
-}
-
-func (b *Bot) generateBigCallbackMessage(message *tgbotapi.Message, user *users.User, startTime time.Time, endTime time.Time, exactTime time.Time) error {
+func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.User, startTime time.Time, endTime time.Time, exactTime time.Time) error {
 	fullMsgString := user.U.Group + "\n"
 
-	for i := startTime; i != endTime; i = i.AddDate(0, 0, 1) {
+	// Select which keyboard to use
+	// if all times are equal then there
+	// is only one day, and we need
+	// to use day keyboard
+	var keyboard *tgbotapi.InlineKeyboardMarkup
+	if startTime == endTime && endTime == exactTime {
+		var err error
+		keyboard, err = b.buildDayKeyboard(exactTime)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		keyboard, err = b.buildWeekKeyboard(exactTime)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Build tt message for every provided day.
+	for i := startTime; i.Unix() <= endTime.Unix(); i = i.AddDate(0, 0, 1) {
 		tts, err := b.db.GetSpecificTt(user.U.Group, i.Day(), int(i.Month()))
 		if err != nil {
 			return err
@@ -338,11 +325,7 @@ func (b *Bot) generateBigCallbackMessage(message *tgbotapi.Message, user *users.
 		fullMsgString += msgString
 	}
 
-	keyboard, err := b.buildWeekKeyboard(exactTime)
-	if err != nil {
-		return err
-	}
-
+	// Make message config.
 	msg := tgbotapi.NewMessage(message.Chat.ID, fullMsgString)
 	msg.ReplyMarkup = keyboard
 	msg.ParseMode = "HTML"
@@ -352,6 +335,7 @@ func (b *Bot) generateBigCallbackMessage(message *tgbotapi.Message, user *users.
 		return err
 	}
 
+	// Add callback to database for further tracking.
 	err = b.db.SaveCallback(message.Chat.ID, m.MessageID, exactTime.Day(), int(exactTime.Month()))
 	if err != nil {
 		return err
@@ -362,6 +346,9 @@ func (b *Bot) generateBigCallbackMessage(message *tgbotapi.Message, user *users.
 	return nil
 }
 
+// getWeekInterval returns two times
+// which corresponds for monday and sunday
+// of a d week.
 func (b *Bot) getWeekInterval(d time.Time) (startTime time.Time, endTime time.Time) {
 	for d.Weekday() != time.Monday {
 		d = d.AddDate(0, 0, -1)
@@ -550,7 +537,7 @@ func (b *Bot) generateMenuKeyboard() *tgbotapi.ReplyKeyboardMarkup {
 }
 
 func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int) error {
-	msg := tgbotapi.NewMessage(chatId, "Выберите форму обучения.")
+	msg := tgbotapi.NewMessage(chatId, "Выберите вашу группу.")
 
 	user.U.LastActionValue += pageOffset
 	err := user.Save()
