@@ -202,7 +202,11 @@ func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
 			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("<u>%s %02d.%02d</u>\n\n", weekday, dday, dmonth))
 		}
 
-		res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>    %s</b>\n    Преподаватель: %s\n    Аудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
+		if tt[t].Subject_type != "" {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>    %s</b>\n    Преподаватель: %s\n    Тип занятия: %s\n    Аудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Subject_type, tt[t].Classroom))
+		} else {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>    %s</b>\n    Преподаватель: %s\n    Аудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
+		}
 		if tt[t].Subgroup != "" {
 			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("\n    Подгруппа: %s\n\n", tt[t].Subgroup))
 		} else {
