@@ -64,7 +64,7 @@ func (d *DataBase) GetAllDistinctFieldWhere(args ...string) ([]string, error) {
 }
 
 func (d *DataBase) GetSpecificTt(group string, day int, month int) ([]models.TT, error) {
-	query := fmt.Sprintf("SELECT * FROM ranh.tt WHERE `groups`='%s' AND `day`='%d' AND `month`='%d';", group, day, month)
+	query := fmt.Sprintf("SELECT * FROM ranh.tt WHERE `groups`='%s' AND `day`='%d' AND `month`='%d' ORDER BY `time`;", group, day, month)
 	rows, err := d.db.Query(query)
 	if err != nil {
 		return nil, err

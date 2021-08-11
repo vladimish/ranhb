@@ -181,6 +181,7 @@ func (b *Bot) handleWeekCallback(query *tgbotapi.CallbackQuery, queryData string
 func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
 	str := ""
 	res := make(map[int][]string, 0)
+	n := 1
 	for t := range tt {
 		dday, err := strconv.Atoi(tt[t].Day)
 		if err != nil {
@@ -202,10 +203,16 @@ func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
 			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("<u>%s %02d.%02d</u>\n\n", weekday, dday, dmonth))
 		}
 
+		if t >= 1 {
+			if tt[t-1].Time != tt[t].Time {
+				n++
+			}
+		}
+
 		if tt[t].Subject_type != "" {
-			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>    %s</b>\n    Преподаватель: %s\n    Тип занятия: %s\n    Аудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Subject_type, tt[t].Classroom))
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>%d. %s</b>\n    Преподаватель: %s\n    Тип занятия: %s\n    Аудитория: %s", tt[t].Time, n, tt[t].Subject, tt[t].Teacher, tt[t].Subject_type, tt[t].Classroom))
 		} else {
-			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>    %s</b>\n    Преподаватель: %s\n    Аудитория: %s", tt[t].Time, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>%d. %s</b>\n    Преподаватель: %s\n    Аудитория: %s", tt[t].Time, n, tt[t].Subject, tt[t].Teacher, tt[t].Classroom))
 		}
 		if tt[t].Subgroup != "" {
 			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("\n    Подгруппа: %s\n\n", tt[t].Subgroup))
