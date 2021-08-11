@@ -19,6 +19,7 @@ type Constants struct {
 }
 
 type Config struct {
+	Mode       string
 	Url        string
 	Port       string
 	DbLogin    string

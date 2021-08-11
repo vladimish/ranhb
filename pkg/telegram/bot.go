@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"errors"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/telf01/ranhb/pkg/configurator"
 	db2 "github.com/telf01/ranhb/pkg/db"
@@ -18,25 +19,45 @@ func NewBot(bot *tgbotapi.BotAPI, db *db2.DataBase) *Bot {
 }
 
 func (b *Bot) Start() error {
-	err := b.initWebhook()
-	if err != nil {
-		return err
-	}
-	err = b.checkWebhookStatus()
-	if err != nil {
-		return err
-	}
-
-	updates := b.bot.ListenForWebhook("/" + b.bot.Token)
-
-	go func() {
-		err := http.ListenAndServeTLS(":"+configurator.Cfg.Port, "public.pem", "private.key", nil)
+	switch configurator.Cfg.Mode {
+	case "webhook":
+		err := b.resetWebhook()
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-	}()
-	b.handleUpdates(updates)
-	return nil
+		err = b.initWebhook()
+		if err != nil {
+			return err
+		}
+		err = b.checkWebhookStatus()
+		if err != nil {
+			return err
+		}
+
+		updates := b.bot.ListenForWebhook("/" + b.bot.Token)
+
+		go func() {
+			err := http.ListenAndServeTLS(":"+configurator.Cfg.Port, "public.pem", "private.key", nil)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
+		b.handleUpdates(updates)
+		return nil
+	case "update":
+		err := b.resetWebhook()
+		if err != nil {
+			return err
+		}
+		updates, err := b.initUpdatesChannel()
+		if err != nil {
+			return err
+		}
+		b.handleUpdates(updates)
+		return nil
+	default:
+		return errors.New("UNKNOWN UPDATE METHOD")
+	}
 }
 
 func (b *Bot) checkWebhookStatus() error {
@@ -50,15 +71,18 @@ func (b *Bot) checkWebhookStatus() error {
 	return nil
 }
 
-func (b *Bot) initWebhook() error {
+func (b *Bot) resetWebhook() error {
 	response, err := b.bot.RemoveWebhook()
 	if err != nil {
 		return err
 	}
 	log.Println(response)
+	return nil
+}
 
+func (b *Bot) initWebhook() error {
 	address := "https://" + configurator.Cfg.Url + ":" + configurator.Cfg.Port + "/"
-	response, err = b.bot.SetWebhook(tgbotapi.NewWebhookWithCert(address+b.bot.Token, "public.pem"))
+	response, err := b.bot.SetWebhook(tgbotapi.NewWebhookWithCert(address+b.bot.Token, "public.pem"))
 	if err != nil {
 		return err
 	}
