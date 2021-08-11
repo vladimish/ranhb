@@ -19,21 +19,9 @@ var InvalidCallbackErr = errors.New("INVALID CALLBACK")
 func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
 	queryParts := strings.Split(query.Data, "/")
 	if len(queryParts) == 2 {
-		switch {
-		case queryParts[0] == "day":
-			err := b.handleDayCallback(query, queryParts[1])
-			if err != nil {
-				return err
-			}
-
-		case queryParts[0] == "week":
-			err := b.handleWeekCallback(query, queryParts[1])
-			if err != nil {
-				return err
-			}
-
-		default:
-			return InvalidCallbackErr
+		err := b.handleTtCallback(query, queryParts[0], queryParts[1])
+		if err != nil {
+			return err
 		}
 	} else {
 		return InvalidCallbackErr
@@ -42,76 +30,16 @@ func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
 	return nil
 }
 
-func (b *Bot) handleDayCallback(query *tgbotapi.CallbackQuery, queryData string) error {
-	days, err := strconv.Atoi(queryData)
-	if err != nil {
-		return err
-	}
-
-	day, month, err := b.db.GetCallback(query.Message.Chat.ID, query.Message.MessageID)
-	if err != nil {
-		return err
-	}
-	cbcfg := tgbotapi.NewCallback(query.ID, "OK")
-	resp, err := b.bot.AnswerCallbackQuery(cbcfg)
-	if err != nil {
-		return err
-	}
-	log.Println(resp)
-
-	user, err := users.Get(query.Message.Chat.ID, b.db)
-	if err != nil {
-		return err
-	}
-
-	d := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone("UTC+3", 0))
-	d = d.AddDate(0, 0, days)
-
-	tts, err := b.db.GetSpecificTt(user.U.Group, d.Day(), int(d.Month()))
-	if err != nil {
-		return err
-	}
-
-	msg, err := b.buildTtMessage(tts, false)
-	if err != nil {
-		return err
-	}
-	msg = "Группа: " + user.U.Group + "\n" + msg
-
-	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fmt.Sprintf("%+v", msg))
-	nmsg.ParseMode = "HTML"
-	m, err := b.bot.Send(nmsg)
-	if err != nil {
-		return err
-	}
-	log.Println(m)
-
-	keyboard, err := b.buildDayKeyboard(d)
-	if err != nil {
-		return err
-	}
-
-	nmarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *keyboard)
-	m, err = b.bot.Send(nmarkup)
-	if err != nil {
-		return err
-	}
-	log.Println(m)
-
-	err = b.db.UpdateCallback(m.Chat.ID, m.MessageID, d.Day(), int(d.Month()))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (b *Bot) handleWeekCallback(query *tgbotapi.CallbackQuery, queryData string) error {
+// handleTtCallback processing callback
+// gotten from tt menu messages
+func (b *Bot) handleTtCallback(query *tgbotapi.CallbackQuery, queryType string, queryData string) error {
+	// Get integer value of callback data.
 	daysToSkip, err := strconv.Atoi(queryData)
 	if err != nil {
 		return err
 	}
 
+	// Find callback in database and get its date.
 	day, month, err := b.db.GetCallback(query.Message.Chat.ID, query.Message.MessageID)
 	if err != nil {
 		return err
@@ -122,13 +50,24 @@ func (b *Bot) handleWeekCallback(query *tgbotapi.CallbackQuery, queryData string
 		return err
 	}
 
-	d := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone("UTC+3", 0))
+	// Get required time interval.
+	d := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone(configurator.Cfg.TimeZone, 0))
 	d = d.AddDate(0, 0, daysToSkip)
-	startTime, endTime := b.getWeekInterval(d)
+	var startTime, endTime time.Time
+	switch queryType {
+	case "week":
+		startTime, endTime = b.getWeekInterval(d)
+	case "day":
+		startTime = d
+		endTime = d
+	default:
+		return InvalidCallbackErr
+	}
 
 	fullMsgString := user.U.Group + "\n"
 
-	for i := startTime; i != endTime; i = i.AddDate(0, 0, 1) {
+	// Build message.
+	for i := startTime; i.Unix() <= endTime.Unix(); i = i.AddDate(0, 0, 1) {
 		tts, err := b.db.GetSpecificTt(user.U.Group, i.Day(), int(i.Month()))
 		if err != nil {
 			return err
@@ -142,6 +81,7 @@ func (b *Bot) handleWeekCallback(query *tgbotapi.CallbackQuery, queryData string
 		fullMsgString += msgString
 	}
 
+	// Create and send message.
 	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fullMsgString)
 	nmsg.ParseMode = "HTML"
 	m, err := b.bot.Send(nmsg)
@@ -151,10 +91,22 @@ func (b *Bot) handleWeekCallback(query *tgbotapi.CallbackQuery, queryData string
 	log.Println(m)
 
 	// Add keyboard to edited message.
-	keyboard, err := b.buildWeekKeyboard(d)
-	if err != nil {
-		return err
+	var keyboard *tgbotapi.InlineKeyboardMarkup
+	switch queryType {
+	case "day":
+		keyboard, err = b.buildDayKeyboard(d)
+		if err != nil {
+			return err
+		}
+	case "week":
+		keyboard, err = b.buildWeekKeyboard(d)
+		if err != nil {
+			return err
+		}
+	default:
+		return InvalidCallbackErr
 	}
+
 	nmarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *keyboard)
 	m, err = b.bot.Send(nmarkup)
 	if err != nil {
@@ -178,6 +130,7 @@ func (b *Bot) handleWeekCallback(query *tgbotapi.CallbackQuery, queryData string
 	return nil
 }
 
+// buildTtMessage creates string from tt slice.
 func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
 	str := ""
 	res := make(map[int][]string, 0)
@@ -233,15 +186,19 @@ func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
 }
 
 func (b *Bot) handleMessage(message *tgbotapi.Message) error {
+	// Search for a user in a database.
 	user, err := users.Get(message.Chat.ID, b.db)
 	if err != nil {
 		return err
 	}
+
+	// Create new user if it's not registered yet.
 	if user.U == nil {
 		user.Init(message.Chat.ID, b.db)
 		user.U.LastActionValue = -configurator.Cfg.PageSize
 	}
 
+	// Choose how to process messages based on the last user action.
 	switch user.U.LastAction {
 	case "start":
 		err := b.handleStartMessage(message, user)
@@ -258,6 +215,7 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	return nil
 }
 
+// handleMenuMessage processes the message sent by the user from the tt view menu.
 func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
 	case configurator.Cfg.Consts.Today:
@@ -284,6 +242,14 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 		if err != nil {
 			return err
 		}
+
+	default:
+		msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда.")
+		response, err := b.bot.Send(msg)
+		if err != nil {
+			return err
+		}
+		log.Println(response)
 	}
 	return nil
 }

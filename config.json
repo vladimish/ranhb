@@ -1,10 +1,11 @@
 {
-  "Mode": "update",
+  "Mode": "webhook",
   "Url": "",
   "Port": "8443",
   "DbLogin": "",
   "DbPassword": "",
   "TgKey": "",
+  "TimeZone": "UTC+3",
   "PageSize": 50,
   "Consts": {
     "Right": "➡",

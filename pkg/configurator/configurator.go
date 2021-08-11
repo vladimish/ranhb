@@ -25,6 +25,7 @@ type Config struct {
 	DbLogin    string
 	DbPassword string
 	TgKey      string
+	TimeZone   string
 	PageSize   int
 	Consts     Constants
 }
