@@ -64,7 +64,8 @@ func (b *Bot) handleTtCallback(query *tgbotapi.CallbackQuery, queryType string, 
 		return InvalidCallbackErr
 	}
 
-	fullMsgString := user.U.Group + "\n"
+	initMsgString := user.U.Group + "\n"
+	fullMsgString := initMsgString
 
 	// Build message.
 	for i := startTime; i.Unix() <= endTime.Unix(); i = i.AddDate(0, 0, 1) {
@@ -73,12 +74,16 @@ func (b *Bot) handleTtCallback(query *tgbotapi.CallbackQuery, queryType string, 
 			return err
 		}
 
-		msgString, err := b.buildTtMessage(tts, true)
+		msgString, err := b.buildTtMessage(tts)
 		if err != nil {
 			return err
 		}
 
 		fullMsgString += msgString
+	}
+
+	if fullMsgString == initMsgString {
+		fullMsgString += "Занятий нет."
 	}
 
 	// Create and send message.
@@ -131,7 +136,7 @@ func (b *Bot) handleTtCallback(query *tgbotapi.CallbackQuery, queryType string, 
 }
 
 // buildTtMessage creates string from tt slice.
-func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
+func (b *Bot) buildTtMessage(tt []models.TT) (string, error) {
 	str := ""
 	res := make(map[int][]string, 0)
 	n := 1
@@ -176,10 +181,6 @@ func (b *Bot) buildTtMessage(tt []models.TT, isMultiday bool) (string, error) {
 
 	for i := range res {
 		str += strings.Join(res[i], "")
-	}
-
-	if len(tt) == 0 && !isMultiday {
-		str = "Занятий нет."
 	}
 
 	return str, nil
@@ -255,7 +256,8 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 }
 
 func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.User, startTime time.Time, endTime time.Time, exactTime time.Time) error {
-	fullMsgString := user.U.Group + "\n"
+	initMsgString := user.U.Group + "\n"
+	fullMsgString := initMsgString
 
 	// Select which keyboard to use
 	// if all times are equal then there
@@ -283,12 +285,16 @@ func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.U
 			return err
 		}
 
-		msgString, err := b.buildTtMessage(tts, true)
+		msgString, err := b.buildTtMessage(tts)
 		if err != nil {
 			return err
 		}
 
 		fullMsgString += msgString
+	}
+
+	if fullMsgString == initMsgString{
+		fullMsgString += "Занятий нет."
 	}
 
 	// Make message config.

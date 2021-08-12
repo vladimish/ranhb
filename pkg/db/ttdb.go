@@ -2,7 +2,6 @@ package db
 
 import (
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/telf01/ranhb/pkg/db/models"
 	"log"
 )

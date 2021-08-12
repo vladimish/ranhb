@@ -22,6 +22,8 @@ type Config struct {
 	Mode       string
 	Url        string
 	Port       string
+	DbUrl      string
+	DbPort     string
 	DbLogin    string
 	DbPassword string
 	TgKey      string

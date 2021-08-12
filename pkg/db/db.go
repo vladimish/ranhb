@@ -3,6 +3,8 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/telf01/ranhb/pkg/configurator"
 )
 
 type DataBase struct {
@@ -14,13 +16,13 @@ func NewDataBase(db *sql.DB) *DataBase {
 }
 
 func InitDBConncetion(login string, password string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(127.0.0.1:3306)/ranh", login, password))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/ranh", login, password, configurator.Cfg.DbUrl, configurator.Cfg.DbPort))
 	if err != nil {
-		return db, err
+		return nil, err
 	}
 	err = db.Ping()
 	if err != nil {
-		return db, err
+		return nil, err
 	}
 
 	return db, nil
