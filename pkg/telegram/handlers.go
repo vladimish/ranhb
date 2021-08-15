@@ -16,6 +16,9 @@ import (
 
 var InvalidCallbackErr = errors.New("INVALID CALLBACK")
 
+var acceptString = "accept"
+var declineString = "decline"
+
 func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
 	queryParts := strings.Split(query.Data, "/")
 	if len(queryParts) == 2 {
@@ -23,8 +26,41 @@ func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
 		if err != nil {
 			return err
 		}
+	} else if len(queryParts) == 1 {
+		err := b.handlePrivacyCallback(query)
+		if err != nil {
+			return err
+		}
 	} else {
 		return InvalidCallbackErr
+	}
+
+	return nil
+}
+
+func (b *Bot) handlePrivacyCallback(query *tgbotapi.CallbackQuery) error {
+	user, err := users.Get(query.Message.Chat.ID, b.db)
+	if err != nil {
+		return err
+	}
+
+	err = user.Init(query.Message.Chat.ID, b.db)
+	if err != nil{
+		return err
+	}
+
+	if query.Data == acceptString {
+		user.U.IsPrivacyAccepted = true
+		user.Save()
+		b.handleStartCommand(query.Message.Chat.ID)
+	} else {
+		user.U.IsPrivacyAccepted = false
+		user.Save()
+	}
+
+	err = b.answerToCallback(query.ID, "OK")
+	if err != nil{
+		return err
 	}
 
 	return nil
@@ -124,8 +160,17 @@ func (b *Bot) handleTtCallback(query *tgbotapi.CallbackQuery, queryType string, 
 		return err
 	}
 
+	err = b.answerToCallback(query.ID, "OK")
+	if err != nil{
+		return err
+	}
+
+	return nil
+}
+
+func (b *Bot) answerToCallback(queryID string, msg string) error{
 	// Answer to callback
-	cbcfg := tgbotapi.NewCallback(query.ID, "OK")
+	cbcfg := tgbotapi.NewCallback(queryID, "OK")
 	resp, err := b.bot.AnswerCallbackQuery(cbcfg)
 	if err != nil {
 		return err
@@ -293,7 +338,7 @@ func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.U
 		fullMsgString += msgString
 	}
 
-	if fullMsgString == initMsgString{
+	if fullMsgString == initMsgString {
 		fullMsgString += "Занятий нет."
 	}
 
@@ -428,7 +473,7 @@ func (b *Bot) handleCommand(message *tgbotapi.Message) error {
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда")
 	switch message.Command() {
 	case "start":
-		err := b.handleStartCommand(msg, message.Chat.ID)
+		err := b.handleStartCommand(message.Chat.ID)
 		if err != nil {
 			return err
 		}
@@ -449,10 +494,19 @@ func (b *Bot) handleCommand(message *tgbotapi.Message) error {
 	return nil
 }
 
-func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig, id int64) error {
+func (b *Bot) handleStartCommand(id int64) error {
 	user, err := users.Get(id, b.db)
 	if err != nil {
 		return err
+	}
+
+	if !user.U.IsPrivacyAccepted {
+		err := b.sendPrivacyNote(id)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	if user.U.Id == 0 || user.U.LastAction != "start" {
@@ -467,7 +521,35 @@ func (b *Bot) handleStartCommand(msg tgbotapi.MessageConfig, id int64) error {
 		}
 	}
 
-	return b.sendGroupsKeyboard(msg.ChatID, user, 0)
+	return b.sendGroupsKeyboard(id, user, 0)
+}
+
+func (b *Bot) sendPrivacyNote(chatId int64) error {
+	msgText := "Для начала работы ознакомьтесь с <a href=\"" + configurator.Cfg.PrivacyUrl + "\">политикой конфиденциальности</a>. Если согласны — нажмите <b>Продолжить</b>"
+	msgConfig := tgbotapi.NewMessage(chatId, msgText)
+	msgConfig.ParseMode = "HTML"
+	msgConfig.ReplyMarkup = b.generatePrivacyKeyboard()
+
+	m, err := b.bot.Send(msgConfig)
+	if err != nil{
+		return err
+	}
+	log.Println("message sent: ", m)
+
+	return nil
+}
+
+func (b *Bot) generatePrivacyKeyboard() *tgbotapi.InlineKeyboardMarkup {
+	row1 := tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("Продолжить", acceptString),
+	)
+	row2 := tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("Отказаться", declineString),
+	)
+
+	ttKeyboard := tgbotapi.NewInlineKeyboardMarkup(row1, row2)
+
+	return &ttKeyboard
 }
 
 func (b *Bot) sendMenuKeyboard(chatId int64, user *users.User) error {
@@ -524,7 +606,7 @@ func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int)
 
 	msg.ReplyMarkup = keyboard
 	if user.U.LastActionValue == configurator.Cfg.PageSize {
-		msg.Text = "Выберите форму обучения."
+		msg.Text = "Выберите вашу группу."
 	}
 	message, err := b.bot.Send(msg)
 

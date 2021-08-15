@@ -34,8 +34,13 @@ func (u *User) Save() error {
 	return nil
 }
 
-func (u *User) Init(id int64, db *db.DataBase) {
+func (u *User) Init(id int64, db *db.DataBase) error {
 	u = NewUser(id, db)
 	u.U.LastAction = "start"
-	u.Save()
+	err := u.Save()
+	if err != nil{
+		return err
+	}
+
+	return nil
 }

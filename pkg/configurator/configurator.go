@@ -29,6 +29,7 @@ type Config struct {
 	TgKey      string
 	TimeZone   string
 	PageSize   int
+	PrivacyUrl string
 	Consts     Constants
 }
 
