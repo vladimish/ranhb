@@ -1,5 +1,7 @@
 package date
 
+import "time"
+
 func IntToWeekday(i int) string {
 	switch i {
 	case 1:
@@ -19,4 +21,17 @@ func IntToWeekday(i int) string {
 	default:
 		return ""
 	}
+}
+
+// GetWeekInterval returns two times
+// which corresponds for monday and sunday
+// of a d week.
+func GetWeekInterval(d time.Time) (startTime time.Time, endTime time.Time) {
+	for d.Weekday() != time.Monday {
+		d = d.AddDate(0, 0, -1)
+	}
+	startTime = d
+	endTime = startTime.Add(6 * 24 * time.Hour)
+
+	return startTime, endTime
 }
