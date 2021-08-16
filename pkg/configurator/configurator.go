@@ -16,6 +16,9 @@ type Constants struct {
 	Tomorrow  string
 	ThisWeek  string
 	NextWeek  string
+	Teachers  string
+	Settings  string
+	Premium   string
 }
 
 type Config struct {

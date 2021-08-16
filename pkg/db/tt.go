@@ -27,7 +27,7 @@ func (d *DataBase) GetAllDistinctField(args ...string) ([]string, error) {
 			"received: " + fmt.Sprintf("%d", len(args)))
 	}
 
-	query := fmt.Sprintf("SELECT DISTINCT `%s` FROM ranh.%s LIMIT %s, %s;", args[0], args[1], args[2], args[3])
+	query := fmt.Sprintf("SELECT DISTINCT `%s` FROM ranh.%s ORDER BY `%s` LIMIT %s, %s;", args[0], args[1], args[0], args[2], args[3])
 	return d.getAllFieldTemplate(query)
 }
 

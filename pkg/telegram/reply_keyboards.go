@@ -6,45 +6,9 @@ import (
 	"github.com/telf01/ranhb/pkg/configurator"
 	"github.com/telf01/ranhb/pkg/users"
 	"log"
-	"time"
 )
 
-func (b *Bot) buildDayKeyboard(date time.Time) (*tgbotapi.InlineKeyboardMarkup, error) {
-	yesterday := fmt.Sprintf("%02d.%02d", date.Add(-24*time.Hour).Day(), date.Add(-24*time.Hour).Month())
-	tomorrow := fmt.Sprintf("%02d.%02d", date.Add(24*time.Hour).Day(), date.Add(24*time.Hour).Month())
-
-	oldYesterday := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, -7).Day(), date.Add(-24*time.Hour).Month())
-	newTomorrow := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, 7).Day(), date.Add(-24*time.Hour).Month())
-
-	ttKeyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.Left+" "+yesterday, "day/-1"),
-			tgbotapi.NewInlineKeyboardButtonData(tomorrow+" "+configurator.Cfg.Consts.Right, "day/1"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.VeryLeft+" "+oldYesterday, "day/-7"),
-			tgbotapi.NewInlineKeyboardButtonData(newTomorrow+" "+configurator.Cfg.Consts.VeryRight, "day/7"),
-		),
-	)
-
-	return &ttKeyboard, nil
-}
-
-func (b *Bot) buildWeekKeyboard(date time.Time) (*tgbotapi.InlineKeyboardMarkup, error) {
-	oldYesterday := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, -7).Day(), date.AddDate(0, 0, -7).Month())
-	newTomorrow := fmt.Sprintf("%02d.%02d", date.AddDate(0, 0, 7).Day(), date.AddDate(0, 0, 7).Month())
-
-	ttKeyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(configurator.Cfg.Consts.VeryLeft+" "+oldYesterday, "week/-7"),
-			tgbotapi.NewInlineKeyboardButtonData(newTomorrow+" "+configurator.Cfg.Consts.VeryRight, "week/7"),
-		),
-	)
-
-	return &ttKeyboard, nil
-}
-
-func (b *Bot) generateMenuKeyboard() *tgbotapi.ReplyKeyboardMarkup {
+func (b *Bot) buildMenuKeyboard(isPremium bool) *tgbotapi.ReplyKeyboardMarkup {
 	var buttons [][]tgbotapi.KeyboardButton
 	row1 := tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Today),
@@ -54,8 +18,19 @@ func (b *Bot) generateMenuKeyboard() *tgbotapi.ReplyKeyboardMarkup {
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.ThisWeek),
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.NextWeek),
 	)
+	row3 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Teachers),
+	)
+	row4 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Settings),
+	)
+
 	buttons = append(buttons, row1)
 	buttons = append(buttons, row2)
+	if isPremium {
+		buttons = append(buttons, row3)
+	}
+	buttons = append(buttons, row4)
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
 
 	return &keyboard
@@ -70,7 +45,7 @@ func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int)
 		return err
 	}
 
-	keyboard, err := b.generateGroupsKeyboard(b.db.GetAllDistinctField, user, "groups", "tt", fmt.Sprintf("%d", user.U.LastActionValue), fmt.Sprintf("%d", configurator.Cfg.PageSize))
+	keyboard, err := b.buildGroupsKeyboard(b.db.GetAllDistinctField, user, "groups", "tt", fmt.Sprintf("%d", user.U.LastActionValue), fmt.Sprintf("%d", configurator.Cfg.PageSize))
 	if err != nil {
 		return err
 	}
@@ -91,7 +66,7 @@ func (b *Bot) sendGroupsKeyboard(chatId int64, user *users.User, pageOffset int)
 
 type dataDrainer func(args ...string) ([]string, error)
 
-func (b *Bot) generateGroupsKeyboard(dd dataDrainer, u *users.User, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
+func (b *Bot) buildGroupsKeyboard(dd dataDrainer, u *users.User, args ...string) (*tgbotapi.ReplyKeyboardMarkup, error) {
 	var buttons [][]tgbotapi.KeyboardButton
 	groups, err := dd(args...)
 	if err != nil {
@@ -134,4 +109,35 @@ func (b *Bot) generateGroupsKeyboard(dd dataDrainer, u *users.User, args ...stri
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
 
 	return &keyboard, nil
+}
+
+func (b *Bot) buildSettingsKeyboard() *tgbotapi.ReplyKeyboardMarkup {
+	var buttons [][]tgbotapi.KeyboardButton
+	row1 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Premium),
+	)
+	row2 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
+	)
+	buttons = append(buttons, row1)
+	buttons = append(buttons, row2)
+	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
+
+	return &keyboard
+}
+
+func (b *Bot) buildTeachersKeyboard(teachers []string) *tgbotapi.ReplyKeyboardMarkup {
+	var rows [][]tgbotapi.KeyboardButton
+	for i := 0; i < len(teachers); i++ {
+		row := tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(teachers[i]),
+		)
+		rows = append(rows, row)
+	}
+	back := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
+	)
+	rows = append(rows, back)
+	keyboard := tgbotapi.NewReplyKeyboard(rows...)
+	return &keyboard
 }

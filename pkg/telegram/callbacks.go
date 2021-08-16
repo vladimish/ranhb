@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 var InvalidCallbackErr = errors.New("INVALID CALLBACK")
@@ -26,6 +27,11 @@ func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
 		if err != nil {
 			return err
 		}
+	} else if len(queryParts) == 3{
+		// err := b.handleTeachersCallback(query, queryParts[1], queryParts[2])
+		//if err != nil{
+		//	return err
+		//}
 	} else {
 		return InvalidCallbackErr
 	}
@@ -113,44 +119,76 @@ func (b *Bot) handleTtCallback(query *tgbotapi.CallbackQuery, queryType string, 
 		fullMsgString += msgString
 	}
 
+	// Build keyboard to edited message.
+	var keyboard *tgbotapi.InlineKeyboardMarkup
+	switch queryType {
+	case "day":
+		keyboard = b.buildDayKeyboard(d)
+	case "week":
+		keyboard = b.buildWeekKeyboard(d)
+	default:
+		return InvalidCallbackErr
+	}
+
+	var msgOverflow bool
+	if utf8.RuneCountInString(fullMsgString) > 4096 {
+		msgOverflow = true
+		tempStr := []rune(fullMsgString)
+		fullMsgString = string(tempStr[4095:])
+		msg := tgbotapi.NewMessage(query.Message.Chat.ID, string(tempStr[:4095]))
+		msg.ParseMode = "HTML"
+
+		_, err := b.bot.Send(msg)
+		if err != nil {
+			return err
+		}
+	}
+
 	if fullMsgString == initMsgString {
 		fullMsgString += "Занятий нет."
 	}
 
 	// Create and send message.
-	nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fullMsgString)
-	nmsg.ParseMode = "HTML"
-	m, err := b.bot.Send(nmsg)
+	var m tgbotapi.Message
+	if msgOverflow {
+		nmsg := tgbotapi.NewMessage(query.Message.Chat.ID, fullMsgString)
+		nmsg.ParseMode = "HTML"
+		nmsg.ReplyMarkup = keyboard
+		m, err = b.bot.Send(nmsg)
+
+		deleteConfig := tgbotapi.NewDeleteMessage(query.Message.Chat.ID, query.Message.MessageID)
+		resp, err := b.bot.DeleteMessage(deleteConfig)
+		if err != nil {
+			return err
+		}
+		log.Println(resp)
+
+		// Replace query id to add inline keyboard below.
+		query.Message.MessageID = m.MessageID
+	} else {
+		nmsg := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fullMsgString)
+		nmsg.ParseMode = "HTML"
+		m, err = b.bot.Send(nmsg)
+	}
 	if err != nil {
 		return err
 	}
 	log.Println(m)
 
-	// Add keyboard to edited message.
-	var keyboard *tgbotapi.InlineKeyboardMarkup
-	switch queryType {
-	case "day":
-		keyboard, err = b.buildDayKeyboard(d)
+	if !msgOverflow {
+		nmarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *keyboard)
+		m, err = b.bot.Send(nmarkup)
 		if err != nil {
 			return err
 		}
-	case "week":
-		keyboard, err = b.buildWeekKeyboard(d)
-		if err != nil {
-			return err
-		}
-	default:
-		return InvalidCallbackErr
+		log.Println(m)
 	}
 
-	nmarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *keyboard)
-	m, err = b.bot.Send(nmarkup)
-	if err != nil {
-		return err
+	if msgOverflow {
+		err = b.db.SaveCallback(m.Chat.ID, m.MessageID, d.Day(), int(d.Month()))
+	} else {
+		err = b.db.UpdateCallback(m.Chat.ID, m.MessageID, d.Day(), int(d.Month()))
 	}
-	log.Println(m)
-
-	err = b.db.UpdateCallback(m.Chat.ID, m.MessageID, d.Day(), int(d.Month()))
 	if err != nil {
 		return err
 	}
@@ -185,17 +223,9 @@ func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.U
 	// to use day keyboard
 	var keyboard *tgbotapi.InlineKeyboardMarkup
 	if startTime == endTime && endTime == exactTime {
-		var err error
-		keyboard, err = b.buildDayKeyboard(exactTime)
-		if err != nil {
-			return err
-		}
+		keyboard = b.buildDayKeyboard(exactTime)
 	} else {
-		var err error
-		keyboard, err = b.buildWeekKeyboard(exactTime)
-		if err != nil {
-			return err
-		}
+		keyboard = b.buildWeekKeyboard(exactTime)
 	}
 
 	// Build tt message for every provided day.
@@ -215,6 +245,78 @@ func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.U
 
 	if fullMsgString == initMsgString {
 		fullMsgString += "Занятий нет."
+	}
+
+	if len(fullMsgString) > 4096 {
+		tempStr := []rune(fullMsgString)
+		fullMsgString = string(tempStr[4095:])
+		msg := tgbotapi.NewMessage(message.Chat.ID, string(tempStr[:4095]))
+		msg.ParseMode = "HTML"
+		_, err := b.bot.Send(msg)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Make message config.
+	msg := tgbotapi.NewMessage(message.Chat.ID, fullMsgString)
+	msg.ReplyMarkup = keyboard
+	msg.ParseMode = "HTML"
+
+	m, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+
+	// Add callback to database for further tracking.
+	err = b.db.SaveCallback(message.Chat.ID, m.MessageID, exactTime.Day(), int(exactTime.Month()))
+	if err != nil {
+		return err
+	}
+
+	log.Println(m)
+
+	return nil
+}
+
+func (b *Bot) generateTeachersCallbackMessage(message *tgbotapi.Message, teacher string, user *users.User, exactTime time.Time) error {
+	initMsgString := teacher + "\n"
+	fullMsgString := initMsgString
+
+	// Select which keyboard to use
+	// if all times are equal then there
+	// is only one day, and we need
+	// to use day keyboard
+
+	keyboard := b.buildTeacherKeyboard(exactTime)
+
+	// Build tt message for every provided day.
+
+	tts, err := b.db.GetTeachersLessons(teacher, user.U.Group, exactTime.Day(), int(exactTime.Month()))
+	if err != nil {
+		return err
+	}
+
+	msgString, err := b.buildTeachersMessage(tts)
+	if err != nil {
+		return err
+	}
+
+	fullMsgString += msgString
+
+	if fullMsgString == initMsgString {
+		fullMsgString += "Занятий нет."
+	}
+
+	if len(fullMsgString) > 4096 {
+		tempStr := []rune(fullMsgString)
+		fullMsgString = string(tempStr[4095:])
+		msg := tgbotapi.NewMessage(message.Chat.ID, string(tempStr[:4095]))
+		msg.ParseMode = "HTML"
+		_, err := b.bot.Send(msg)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Make message config.

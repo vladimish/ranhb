@@ -67,6 +67,56 @@ func (b *Bot) buildTtMessage(tt []models.TT) (string, error) {
 	return str, nil
 }
 
+func (b *Bot) buildTeachersMessage(tt []models.TT) (string, error) {
+	str := ""
+	res := make(map[int][]string, 0)
+	n := 1
+	for t := range tt {
+		dday, err := strconv.Atoi(tt[t].Day)
+		if err != nil {
+			return "", err
+		}
+		dmonth, err := strconv.Atoi(tt[t].Month)
+		if err != nil {
+			return "", err
+		}
+
+		weekdayNumber, err := strconv.Atoi(tt[t].Day_of_week)
+		if err != nil {
+			return "", err
+		}
+		weekday := date.IntToWeekday(weekdayNumber)
+
+		if len(res[dday*100+dmonth]) == 0 {
+			res[dday*100+dmonth] = []string{}
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("<u>%s %02d.%02d</u>\n\n", weekday, dday, dmonth))
+		}
+
+		if t >= 1 {
+			if tt[t-1].Time != tt[t].Time {
+				n++
+			}
+		}
+
+		if tt[t].Subject_type != "" {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>%d. %s</b>\n    Группа: %s\n    Тип занятия: %s\n    Аудитория: %s", tt[t].Time, n, tt[t].Subject, tt[t].Groups, tt[t].Subject_type, tt[t].Classroom))
+		} else {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("%s\n<b>%d. %s</b>\n    Группа: %s\n    Аудитория: %s", tt[t].Time, n, tt[t].Subject, tt[t].Groups, tt[t].Classroom))
+		}
+		if tt[t].Subgroup != "" {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], fmt.Sprintf("\n    Подгруппа: %s\n\n", tt[t].Subgroup))
+		} else {
+			res[dday*100+dmonth] = append(res[dday*100+dmonth], "\n\n")
+		}
+	}
+
+	for i := range res {
+		str += strings.Join(res[i], "")
+	}
+
+	return str, nil
+}
+
 func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	// Search for a user in a database.
 	user, err := users.Get(message.Chat.ID, b.db)
@@ -76,7 +126,10 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 
 	// Create new user if it's not registered yet.
 	if user.U == nil {
-		user.Init(message.Chat.ID, b.db)
+		err := user.Init(message.Chat.ID, b.db)
+		if err != nil {
+			return err
+		}
 		user.U.LastActionValue = -configurator.Cfg.PageSize
 	}
 
@@ -89,6 +142,21 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		}
 	case "menu":
 		err := b.handleMenuMessage(message, user)
+		if err != nil {
+			return err
+		}
+	case "settings":
+		err := b.handleSettingsMessage(message, user)
+		if err != nil {
+			return err
+		}
+	case "teachers":
+		err := b.handleTeachersMessage(message, user)
+		if err != nil {
+			return err
+		}
+	case "teachers_selection":
+		err := b.handleTeacherSelectionMessage(message, user)
 		if err != nil {
 			return err
 		}
@@ -124,6 +192,35 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 		if err != nil {
 			return err
 		}
+	case configurator.Cfg.Consts.Teachers:
+		user.U.LastAction = "teachers"
+		user.U.LastActionValue = 0
+		err := user.Save()
+		if err != nil {
+			return err
+		}
+		msg := tgbotapi.NewMessage(message.Chat.ID, "Введите фамилию преподавателя")
+		msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
+			tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
+			),
+		)
+		b.bot.Send(msg)
+	case configurator.Cfg.Consts.Settings:
+		user.U.LastAction = "settings"
+		user.U.LastActionValue = 0
+		err := user.Save()
+		if err != nil {
+			return err
+		}
+		settingsKeyboard := b.buildSettingsKeyboard()
+		msg := tgbotapi.NewMessage(message.Chat.ID, configurator.Cfg.Consts.Settings)
+		msg.ReplyMarkup = settingsKeyboard
+		m, err := b.bot.Send(msg)
+		if err != nil {
+			return err
+		}
+		log.Println(m)
 
 	default:
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда.")
@@ -133,6 +230,58 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 		}
 		log.Println(response)
 	}
+	return nil
+}
+
+func (b *Bot) handleSettingsMessage(message *tgbotapi.Message, user *users.User) error {
+	switch message.Text {
+	case configurator.Cfg.Consts.Left:
+		user.U.LastAction = "menu"
+		user.U.LastActionValue = 0
+		err := user.Save()
+		if err != nil {
+			return err
+		}
+		err = b.sendMenuKeyboard(user)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *Bot) handleTeachersMessage(message *tgbotapi.Message, user *users.User) error {
+	switch message.Text {
+	case configurator.Cfg.Consts.Left:
+		user.U.LastAction = "menu"
+		user.U.LastActionValue = 0
+		err := user.Save()
+		if err != nil {
+			return err
+		}
+		err = b.sendMenuKeyboard(user)
+		if err != nil {
+			return err
+		}
+	default:
+		teachers, err := b.db.GetTeachers(message.Text)
+		if err != nil {
+			return err
+		}
+		msg := tgbotapi.NewMessage(message.Chat.ID, "")
+		if len(teachers) > 0 {
+			msg.Text = "Выберите преподавателя из списка"
+			msg.ReplyMarkup = b.buildTeachersKeyboard(teachers)
+			user.U.LastAction = "teachers_selection"
+			user.Save()
+		} else {
+			msg.Text = "Преподаватель не найден"
+		}
+
+		b.bot.Send(msg)
+	}
+
 	return nil
 }
 
@@ -177,7 +326,7 @@ func (b *Bot) handleStartMessage(message *tgbotapi.Message, user *users.User) er
 			}
 			log.Println("Message sent: ", m)
 
-			err = b.sendMenuKeyboard(message.Chat.ID, user)
+			err = b.sendMenuKeyboard(user)
 			if err != nil {
 				return err
 			}
@@ -209,28 +358,20 @@ func (b *Bot) sendPrivacyNote(chatId int64) error {
 	return nil
 }
 
-func (b *Bot) generatePrivacyKeyboard() *tgbotapi.InlineKeyboardMarkup {
-	row1 := tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("Продолжить", acceptString),
-	)
-	row2 := tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("Отказаться", declineString),
-	)
-
-	ttKeyboard := tgbotapi.NewInlineKeyboardMarkup(row1, row2)
-
-	return &ttKeyboard
-}
-
-func (b *Bot) sendMenuKeyboard(chatId int64, user *users.User) error {
-	msg := tgbotapi.NewMessage(chatId, "Меню")
+func (b *Bot) sendMenuKeyboard(user *users.User) error {
+	msg := tgbotapi.NewMessage(user.U.Id, "Меню")
 	user.U.LastAction = "menu"
 	err := user.Save()
 	if err != nil {
 		return err
 	}
 
-	keyboard := b.generateMenuKeyboard()
+	isUserPremium, err := b.db.CheckPremiumStatus(user.U.Id)
+	if err != nil {
+		return err
+	}
+
+	keyboard := b.buildMenuKeyboard(isUserPremium)
 	msg.ReplyMarkup = keyboard
 
 	message, err := b.bot.Send(msg)
@@ -240,5 +381,58 @@ func (b *Bot) sendMenuKeyboard(chatId int64, user *users.User) error {
 
 	log.Println("Message sent: ", message)
 
+	return nil
+}
+
+func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *users.User) error {
+	switch message.Text {
+	case configurator.Cfg.Consts.Left:
+		user.U.LastAction = "menu"
+		err := user.Save()
+		if err != nil {
+			return err
+		}
+
+		err = b.sendMenuKeyboard(user)
+		if err != nil {
+			return err
+		}
+	default:
+		exists, err := b.db.IsTeacherExists(message.Text)
+		if err != nil {
+			return err
+		}
+		if exists {
+			tts, err := b.db.GetTeachersLessons(message.Text, user.U.Group, time.Now().Day(), int(time.Now().Month()))
+			if err != nil {
+				return err
+			}
+
+			var msgString string
+			if len(tts) == 0 {
+				msgString = "Нет занятий."
+			} else {
+				msgString += message.Text + "\n"
+				msgString, err = b.buildTtMessage(tts)
+				if err != nil {
+					return err
+				}
+			}
+			msg := tgbotapi.NewMessage(message.Chat.ID, msgString)
+			msg.ParseMode = "HTML"
+			m, err := b.bot.Send(msg)
+			if err != nil {
+				return err
+			}
+			log.Println(m)
+		} else {
+			user.U.LastAction = "teachers"
+			user.Save()
+			err := b.handleTeachersMessage(message, user)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
