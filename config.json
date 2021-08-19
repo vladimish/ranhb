@@ -1,0 +1,26 @@
+{
+  "Mode": "webhook",
+  "Url": "",
+  "Port": "8443",
+  "DbUrl": "",
+  "DbPort": "3306",
+  "DbLogin": "mysql",
+  "DbPassword": "",
+  "TgKey": "",
+  "TimeZone": "UTC+3",
+  "PageSize": 50,
+  "PrivacyUrl": "https://docs.google.com/document/d/1dg7pPxVwvhmmwsMaaXYKNmliz15_q2JXdAm1a7c7-YU",
+  "Consts": {
+    "Right": "➡",
+    "Left": "⬅",
+    "VeryRight": "⏩",
+    "VeryLeft": "⏪",
+    "Today": "Сегодня",
+    "Tomorrow": "Завтра",
+    "ThisWeek": "Эта неделя",
+    "NextWeek": "Следующая неделя",
+    "Teachers": "Расписание преподавателей",
+    "Settings": "Настройки",
+    "Premium": "Ranh bot Premium"
+  }
+}
