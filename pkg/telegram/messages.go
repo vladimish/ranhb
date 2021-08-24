@@ -250,6 +250,11 @@ func (b *Bot) handleSettingsMessage(message *tgbotapi.Message, user *users.User)
 		if err != nil {
 			return err
 		}
+	case configurator.Cfg.Consts.Info:
+		err := b.sendInfoMessage(user.U.Id)
+		if err != nil{
+			return err
+		}
 	case configurator.Cfg.Consts.Premium:
 		err := b.sendPremiumKeyboard(user)
 		if err != nil {
@@ -259,6 +264,18 @@ func (b *Bot) handleSettingsMessage(message *tgbotapi.Message, user *users.User)
 
 	return nil
 }
+
+func (b *Bot) sendInfoMessage(id int64) error {
+	text := "Ranh bot v1.0\n\nРазработано Владимиром Мишаковым\nПри поддержке Александра Тарасюка\n\nПо всем вопросам и предложением обращайтесь на 01.vladimir.mishakov@gmail.com или @telf01"
+	msg := tgbotapi.NewMessage(id, text)
+	m, err := b.bot.Send(msg)
+	if err != nil{
+		return err
+	}
+	log.Println(m)
+	return nil
+}
+
 
 func (b *Bot) handleTeachersMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
@@ -410,7 +427,7 @@ func (b *Bot) sendPremiumKeyboard(user *users.User) error {
 		log.Println(answer)
 	}
 
-	msg := tgbotapi.NewMessage(user.U.Id, "Выберите подписку")
+	msg := tgbotapi.NewMessage(user.U.Id, "Премиум доступ откроет тебе возможность воспользоваться уникальными функциями нашего Бота. Есть какая-то задолженность? Либо надо встретиться с конкретным преподавателем по какому-то срочному вопросу, и ты не знаешь, где его искать? Не беда! Теперь ты можешь быть в курсе всех событий: видеть своё расписание на неделю и также расписание конкретного преподавателя. В будущем мы добавим ещё огромное количество новых и интересных фишек. Оставайся с нами, и будь всегда на шаг впереди!")
 	user.U.LastAction = "premium"
 	user.U.LastActionValue = 0
 	err := user.Save()
@@ -510,7 +527,6 @@ func (b *Bot) buildTeacherTtMessage(message *tgbotapi.Message, user *users.User,
 func (b *Bot) handlePremiumMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
 	case configurator.Cfg.Consts.Left:
-
 		err := b.sendSettingsKeyboard(user)
 		if err != nil {
 			return err

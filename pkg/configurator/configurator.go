@@ -19,6 +19,7 @@ type Constants struct {
 	Teachers  string
 	Settings  string
 	Premium   string
+	Info      string
 }
 
 type Config struct {

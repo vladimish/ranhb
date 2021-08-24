@@ -145,10 +145,14 @@ func (b *Bot) buildSettingsKeyboard() *tgbotapi.ReplyKeyboardMarkup {
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Premium),
 	)
 	row2 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Info),
+	)
+	row3 := tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
 	)
 	buttons = append(buttons, row1)
 	buttons = append(buttons, row2)
+	buttons = append(buttons, row3)
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
 
 	return &keyboard
