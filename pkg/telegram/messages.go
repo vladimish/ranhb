@@ -160,6 +160,11 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		if err != nil {
 			return err
 		}
+	case "premium":
+		err := b.handlePremiumMessage(message, user)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return nil
@@ -181,16 +186,28 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 			return err
 		}
 	case configurator.Cfg.Consts.ThisWeek:
-		startTime, endTime := date.GetWeekInterval(time.Now())
-		err := b.generateTtCallbackMessage(message, user, startTime, endTime, time.Now())
-		if err != nil {
+		isPremium, err := b.db.CheckPremiumStatus(user.U.Id)
+		if err != nil{
 			return err
 		}
+		if isPremium {
+			startTime, endTime := date.GetWeekInterval(time.Now())
+			err := b.generateTtCallbackMessage(message, user, startTime, endTime, time.Now())
+			if err != nil {
+				return err
+			}
+		}
 	case configurator.Cfg.Consts.NextWeek:
-		startTime, endTime := date.GetWeekInterval(time.Now().AddDate(0, 0, 7))
-		err := b.generateTtCallbackMessage(message, user, startTime, endTime, time.Now().AddDate(0, 0, 7))
-		if err != nil {
+		isPremium, err := b.db.CheckPremiumStatus(user.U.Id)
+		if err != nil{
 			return err
+		}
+		if isPremium {
+			startTime, endTime := date.GetWeekInterval(time.Now().AddDate(0, 0, 7))
+			err := b.generateTtCallbackMessage(message, user, startTime, endTime, time.Now().AddDate(0, 0, 7))
+			if err != nil {
+				return err
+			}
 		}
 	case configurator.Cfg.Consts.Teachers:
 		user.U.LastAction = "teachers"
@@ -213,14 +230,7 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 		if err != nil {
 			return err
 		}
-		settingsKeyboard := b.buildSettingsKeyboard()
-		msg := tgbotapi.NewMessage(message.Chat.ID, configurator.Cfg.Consts.Settings)
-		msg.ReplyMarkup = settingsKeyboard
-		m, err := b.bot.Send(msg)
-		if err != nil {
-			return err
-		}
-		log.Println(m)
+		err = b.sendSettingsKeyboard(user)
 
 	default:
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Неизвестная команда.")
@@ -236,13 +246,12 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 func (b *Bot) handleSettingsMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
 	case configurator.Cfg.Consts.Left:
-		user.U.LastAction = "menu"
-		user.U.LastActionValue = 0
-		err := user.Save()
+		err := b.sendMenuKeyboard(user)
 		if err != nil {
 			return err
 		}
-		err = b.sendMenuKeyboard(user)
+	case configurator.Cfg.Consts.Premium:
+		err := b.sendPremiumKeyboard(user)
 		if err != nil {
 			return err
 		}
@@ -384,6 +393,49 @@ func (b *Bot) sendMenuKeyboard(user *users.User) error {
 	return nil
 }
 
+func (b *Bot) sendPremiumKeyboard(user *users.User) error {
+	if !user.U.IsTermsOfUseAccepted {
+		txt := "Совершая покупку, вы соглашаетесь с <a href=\"" + configurator.Cfg.TermsOfUseUrl + "\">условиями предоставления услуг</a>."
+		msg := tgbotapi.NewMessage(user.U.Id, txt)
+		msg.ParseMode = "HTML"
+		answer, err := b.bot.Send(msg)
+		if err != nil {
+			return err
+		}
+		user.U.IsTermsOfUseAccepted = true
+		err = user.Save()
+		if err != nil {
+			return err
+		}
+		log.Println(answer)
+	}
+
+	msg := tgbotapi.NewMessage(user.U.Id, "Выберите подписку")
+	user.U.LastAction = "premium"
+	user.U.LastActionValue = 0
+	err := user.Save()
+	if err != nil {
+		return err
+	}
+
+	isUserPremium, err := b.db.CheckPremiumStatus(user.U.Id)
+	if err != nil {
+		return err
+	}
+
+	keyboard := b.buildPremiumKeyboard(isUserPremium)
+	msg.ReplyMarkup = keyboard
+
+	message, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Message sent: ", message)
+
+	return nil
+}
+
 func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
 	case configurator.Cfg.Consts.Left:
@@ -434,5 +486,39 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 			}
 		}
 	}
+	return nil
+}
+
+func (b *Bot) handlePremiumMessage(message *tgbotapi.Message, user *users.User) error {
+	switch message.Text {
+	case configurator.Cfg.Consts.Left:
+
+		err := b.sendSettingsKeyboard(user)
+		if err != nil {
+			return err
+		}
+	case configurator.Cfg.Prem.One:
+		err := b.sendBuyMessage(user, 1)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *Bot) sendBuyMessage(user *users.User, months int) error {
+	// TODO: GENERATING PAYMENT URL
+	url := "payment url"
+
+	msg := tgbotapi.NewMessage(user.U.Id, url)
+
+	message, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Message sent: ", message)
+
 	return nil
 }

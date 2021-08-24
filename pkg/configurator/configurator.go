@@ -22,18 +22,28 @@ type Constants struct {
 }
 
 type Config struct {
-	Mode       string
-	Url        string
-	Port       string
-	DbUrl      string
-	DbPort     string
-	DbLogin    string
-	DbPassword string
-	TgKey      string
-	TimeZone   string
-	PageSize   int
-	PrivacyUrl string
-	Consts     Constants
+	Mode          string
+	Url           string
+	Port          string
+	DbUrl         string
+	DbPort        string
+	DbLogin       string
+	DbPassword    string
+	TgKey         string
+	TimeZone      string
+	PageSize      int
+	PrivacyUrl    string
+	TermsOfUseUrl string
+	Consts        Constants
+	Prem          Premium
+}
+
+type Premium struct {
+	One    string
+	Three  string
+	Six    string
+	Twelve string
+	Cancel string
 }
 
 var Cfg *Config

@@ -26,6 +26,34 @@ func (b *Bot) buildMenuKeyboard(isPremium bool) *tgbotapi.ReplyKeyboardMarkup {
 	)
 
 	buttons = append(buttons, row1)
+	if isPremium {
+		buttons = append(buttons, row2)
+		buttons = append(buttons, row3)
+	}
+	buttons = append(buttons, row4)
+	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
+
+	return &keyboard
+}
+
+func (b *Bot) buildPremiumKeyboard(isPremium bool) *tgbotapi.ReplyKeyboardMarkup {
+	var buttons [][]tgbotapi.KeyboardButton
+	row1 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Prem.One),
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Prem.Three),
+	)
+	row2 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Prem.Six),
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Prem.Twelve),
+	)
+	row3 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Prem.Cancel),
+	)
+	row4 := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
+	)
+
+	buttons = append(buttons, row1)
 	buttons = append(buttons, row2)
 	if isPremium {
 		buttons = append(buttons, row3)
@@ -140,4 +168,20 @@ func (b *Bot) buildTeachersKeyboard(teachers []string) *tgbotapi.ReplyKeyboardMa
 	rows = append(rows, back)
 	keyboard := tgbotapi.NewReplyKeyboard(rows...)
 	return &keyboard
+}
+
+func(b *Bot) sendSettingsKeyboard(user *users.User)error{
+	user.U.LastAction = "settings"
+	user.U.LastActionValue = 0
+	user.Save()
+	settingsKeyboard := b.buildSettingsKeyboard()
+	msg := tgbotapi.NewMessage(user.U.Id, configurator.Cfg.Consts.Settings)
+	msg.ReplyMarkup = settingsKeyboard
+	m, err := b.bot.Send(msg)
+	if err != nil {
+		return err
+	}
+	log.Println(m)
+
+	return nil
 }

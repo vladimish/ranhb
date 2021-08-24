@@ -2,7 +2,7 @@
   "Mode": "webhook",
   "Url": "",
   "Port": "8443",
-  "DbUrl": "",
+  "DbUrl": "localhost",
   "DbPort": "3306",
   "DbLogin": "mysql",
   "DbPassword": "",
@@ -10,6 +10,7 @@
   "TimeZone": "UTC+3",
   "PageSize": 50,
   "PrivacyUrl": "https://docs.google.com/document/d/1dg7pPxVwvhmmwsMaaXYKNmliz15_q2JXdAm1a7c7-YU",
+  "TermsOfUseUrl": "https://docs.google.com/document/d/1IUpduxboWRdY2EJ6aFApI64Zuz23KG3HbriLbJSs6BA",
   "Consts": {
     "Right": "➡",
     "Left": "⬅",
@@ -22,5 +23,12 @@
     "Teachers": "Расписание преподавателей",
     "Settings": "Настройки",
     "Premium": "Ranh bot Premium"
+  },
+  "Prem": {
+    "One": "1 Месяц - 49 руб.",
+    "Three": "3 Месяца - 129 руб.",
+    "Six": "6 Месяцев - 249 руб.",
+    "Twelve": "1 Год - 499 руб.",
+    "Cancel": "Отменить подписку"
   }
 }
