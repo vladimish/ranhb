@@ -455,28 +455,21 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 			return err
 		}
 		if exists {
-			tts, err := b.db.GetTeachersLessons(message.Text, user.U.Group, time.Now().Day(), int(time.Now().Month()))
-			if err != nil {
+			msg, err := b.buildTeacherTtMessage(message, user, time.Now())
+			if err != nil{
 				return err
 			}
 
-			var msgString string
-			if len(tts) == 0 {
-				msgString = "Нет занятий."
-			} else {
-				msgString += message.Text + "\n"
-				msgString, err = b.buildTtMessage(tts)
-				if err != nil {
-					return err
-				}
-			}
-			msg := tgbotapi.NewMessage(message.Chat.ID, msgString)
-			msg.ParseMode = "HTML"
 			m, err := b.bot.Send(msg)
 			if err != nil {
 				return err
 			}
 			log.Println(m)
+
+			err = b.db.SaveTeacherCallback(message.Chat.ID, m.MessageID, time.Now().Day(), int(time.Now().Month()), message.Text)
+			if err != nil{
+				return err
+			}
 		} else {
 			user.U.LastAction = "teachers"
 			user.Save()
@@ -487,6 +480,31 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 		}
 	}
 	return nil
+}
+
+func (b *Bot) buildTeacherTtMessage(message *tgbotapi.Message, user *users.User, date time.Time) (*tgbotapi.MessageConfig ,error) {
+	tts, err := b.db.GetTeachersLessons(message.Text, user.U.Group, date.Day(), int(date.Month()))
+	if err != nil {
+		return nil, err
+	}
+
+	var msgString string
+	if len(tts) == 0 {
+		msgString = message.Text + "\n"
+		msgString += "Нет занятий."
+	} else {
+		msgString += message.Text + "\n"
+		msgString, err = b.buildTtMessage(tts)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, msgString)
+	msg.ReplyMarkup = b.buildTeacherKeyboard(date)
+	msg.ParseMode = "HTML"
+
+	return &msg, nil
 }
 
 func (b *Bot) handlePremiumMessage(message *tgbotapi.Message, user *users.User) error {

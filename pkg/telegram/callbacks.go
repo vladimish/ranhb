@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"errors"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/telf01/ranhb/pkg/configurator"
 	"github.com/telf01/ranhb/pkg/users"
 	"github.com/telf01/ranhb/pkg/utils/date"
@@ -27,11 +27,11 @@ func (b *Bot) handleCallback(query *tgbotapi.CallbackQuery) error {
 		if err != nil {
 			return err
 		}
-	} else if len(queryParts) == 3{
-		// err := b.handleTeachersCallback(query, queryParts[1], queryParts[2])
-		//if err != nil{
-		//	return err
-		//}
+	} else if len(queryParts) == 3 {
+		err := b.handleTeachersCallback(query, queryParts[1], queryParts[2])
+		if err != nil {
+			return err
+		}
 	} else {
 		return InvalidCallbackErr
 	}
@@ -279,59 +279,63 @@ func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.U
 	return nil
 }
 
-func (b *Bot) generateTeachersCallbackMessage(message *tgbotapi.Message, teacher string, user *users.User, exactTime time.Time) error {
-	initMsgString := teacher + "\n"
+func (b *Bot) handleTeachersCallback(query *tgbotapi.CallbackQuery, queryType string, queryData string) error {
+	user, err := users.Get(query.Message.Chat.ID, b.db)
+	if err != nil {
+		return err
+	}
+
+	// Get integer value of callback data.
+	daysToSkip, err := strconv.Atoi(queryData)
+	if err != nil {
+		return err
+	}
+
+	// Find callback in database and get its date.
+	day, month, teacherName, err := b.db.GetTeacherCallback(query.Message.Chat.ID, query.Message.MessageID)
+	if err != nil {
+		return err
+	}
+
+	targetDate := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone(configurator.Cfg.TimeZone, 0))
+	targetDate = targetDate.AddDate(0, 0, daysToSkip)
+
+	initMsgString := user.U.Group + "\n"
 	fullMsgString := initMsgString
 
-	// Select which keyboard to use
-	// if all times are equal then there
-	// is only one day, and we need
-	// to use day keyboard
-
-	keyboard := b.buildTeacherKeyboard(exactTime)
-
-	// Build tt message for every provided day.
-
-	tts, err := b.db.GetTeachersLessons(teacher, user.U.Group, exactTime.Day(), int(exactTime.Month()))
+	tts, err := b.db.GetTeachersLessons(teacherName, user.U.Group, targetDate.Day(), int(targetDate.Month()))
 	if err != nil {
 		return err
 	}
 
-	msgString, err := b.buildTeachersMessage(tts)
-	if err != nil {
-		return err
-	}
-
-	fullMsgString += msgString
-
-	if fullMsgString == initMsgString {
-		fullMsgString += "Занятий нет."
-	}
-
-	if len(fullMsgString) > 4096 {
-		tempStr := []rune(fullMsgString)
-		fullMsgString = string(tempStr[4095:])
-		msg := tgbotapi.NewMessage(message.Chat.ID, string(tempStr[:4095]))
-		msg.ParseMode = "HTML"
-		_, err := b.bot.Send(msg)
+	if len(tts) == 0 {
+		fullMsgString += "Нет занятий."
+	} else {
+		tmsg, err := b.buildTeachersMessage(tts)
 		if err != nil {
 			return err
 		}
+		fullMsgString += tmsg
 	}
 
-	// Make message config.
-	msg := tgbotapi.NewMessage(message.Chat.ID, fullMsgString)
-	msg.ReplyMarkup = keyboard
-	msg.ParseMode = "HTML"
+	markup := b.buildTeacherKeyboard(targetDate)
+	editedMarkup := tgbotapi.NewEditMessageReplyMarkup(query.Message.Chat.ID, query.Message.MessageID, *markup)
+	editedText := tgbotapi.NewEditMessageText(query.Message.Chat.ID, query.Message.MessageID, fullMsgString)
+	editedText.ParseMode = "HTML"
 
-	m, err := b.bot.Send(msg)
-	if err != nil {
+	err = b.db.UpdateCallback(query.Message.Chat.ID, query.Message.MessageID, targetDate.Day(), int(targetDate.Month()))
+	if err != nil{
 		return err
 	}
 
-	// Add callback to database for further tracking.
-	err = b.db.SaveCallback(message.Chat.ID, m.MessageID, exactTime.Day(), int(exactTime.Month()))
-	if err != nil {
+	m, err := b.bot.Send(editedText)
+	if err != nil{
+		return err
+	}
+	log.Println(m)
+
+	m, err = b.bot.Send(editedMarkup)
+	if err != nil{
 		return err
 	}
 
