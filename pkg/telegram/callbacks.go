@@ -280,11 +280,6 @@ func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.U
 }
 
 func (b *Bot) handleTeachersCallback(query *tgbotapi.CallbackQuery, queryType string, queryData string) error {
-	user, err := users.Get(query.Message.Chat.ID, b.db)
-	if err != nil {
-		return err
-	}
-
 	// Get integer value of callback data.
 	daysToSkip, err := strconv.Atoi(queryData)
 	if err != nil {
@@ -300,10 +295,10 @@ func (b *Bot) handleTeachersCallback(query *tgbotapi.CallbackQuery, queryType st
 	targetDate := time.Date(time.Now().Year(), time.Month(month), day, 0, 0, 0, 0, time.FixedZone(configurator.Cfg.TimeZone, 0))
 	targetDate = targetDate.AddDate(0, 0, daysToSkip)
 
-	initMsgString := user.U.Group + "\n"
+	initMsgString := teacherName + "\n"
 	fullMsgString := initMsgString
 
-	tts, err := b.db.GetTeachersLessons(teacherName, user.U.Group, targetDate.Day(), int(targetDate.Month()))
+	tts, err := b.db.GetTeachersLessons(teacherName, "%", targetDate.Day(), int(targetDate.Month()))
 	if err != nil {
 		return err
 	}

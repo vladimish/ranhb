@@ -41,7 +41,7 @@ func (d *DataBase) IsTeacherExists(teacher string) (bool, error) {
 }
 
 func (d *DataBase) GetTeachersLessons(name, group string, day, month int) ([]models.TT, error) {
-	query := fmt.Sprintf("SELECT tt.time, tt.subject, tt.classroom, tt.groups, tt.subgroup, tt.day_of_week FROM ranh.tt INNER JOIN ranh.teachers ON ranh.tt.teacher = ranh.teachers.id WHERE ranh.teachers.teacher='%s' AND ranh.tt.day='%d' AND ranh.tt.month='%d' AND ranh.tt.groups='%s';", name, day, month, group)
+	query := fmt.Sprintf("SELECT tt.time, tt.subject, tt.classroom, tt.groups, tt.subgroup, tt.day_of_week FROM ranh.tt INNER JOIN ranh.teachers ON ranh.tt.teacher = ranh.teachers.id WHERE ranh.teachers.teacher='%s' AND ranh.tt.day='%d' AND ranh.tt.month='%d' AND ranh.tt.groups LIKE '%s';", name, day, month, group)
 	rows, err := d.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,9 @@ func (d *DataBase) GetTeachersLessons(name, group string, day, month int) ([]mod
 		rows.Scan(&tt.Time, &tt.Subject, &tt.Classroom, &tt.Groups, &tt.Subgroup, &tt.Day_of_week)
 		tt.Day = fmt.Sprintf("%d", day)
 		tt.Month = fmt.Sprintf("%d", month)
-		tt.Groups = group
+		if group != "%" {
+			tt.Groups = group
+		}
 		tt.Teacher = name
 		tts = append(tts, tt)
 	}
