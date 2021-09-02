@@ -150,7 +150,9 @@ func (b *Bot) buildSettingsKeyboard() *tgbotapi.ReplyKeyboardMarkup {
 	row3 := tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
 	)
-	buttons = append(buttons, row1)
+	if configurator.Cfg.Premium {
+		buttons = append(buttons, row1)
+	}
 	buttons = append(buttons, row2)
 	buttons = append(buttons, row3)
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
@@ -174,7 +176,7 @@ func (b *Bot) buildTeachersKeyboard(teachers []string) *tgbotapi.ReplyKeyboardMa
 	return &keyboard
 }
 
-func(b *Bot) sendSettingsKeyboard(user *users.User)error{
+func (b *Bot) sendSettingsKeyboard(user *users.User) error {
 	user.U.LastAction = "settings"
 	user.U.LastActionValue = 0
 	user.Save()

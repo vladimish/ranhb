@@ -1,5 +1,5 @@
 {
-  "Mode": "webhook",
+  "Mode": "update",
   "Url": "",
   "Port": "8443",
   "DbUrl": "localhost",
@@ -11,6 +11,7 @@
   "PageSize": 50,
   "PrivacyUrl": "https://docs.google.com/document/d/1dg7pPxVwvhmmwsMaaXYKNmliz15_q2JXdAm1a7c7-YU",
   "TermsOfUseUrl": "https://docs.google.com/document/d/1IUpduxboWRdY2EJ6aFApI64Zuz23KG3HbriLbJSs6BA",
+  "Premium": false,
   "Consts": {
     "Right": "➡",
     "Left": "⬅",

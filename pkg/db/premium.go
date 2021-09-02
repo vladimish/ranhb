@@ -2,11 +2,16 @@ package db
 
 import (
 	"fmt"
+	"github.com/telf01/ranhb/pkg/configurator"
 	"log"
 	"time"
 )
 
 func (d *DataBase) CheckPremiumStatus(userId int64) (bool, error) {
+	if !configurator.Cfg.Premium {
+		return false, nil
+	}
+
 	rows, err := d.db.Query(fmt.Sprintf("SELECT end_date FROM ranh.premium WHERE `user_id`=%d;", userId))
 	if err != nil {
 		return false, err
@@ -32,7 +37,7 @@ func (d *DataBase) AddPremium(userId int64, duration time.Duration) error {
 	if !isPremium {
 		query := fmt.Sprintf("INSERT INTO ranh.premium (user_id, begin_date, end_date) VALUES (%d, %d, %d);", userId, time.Now().Unix(), time.Now().Add(duration).Unix())
 		result, err := d.db.Exec(query)
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		log.Println(result)

@@ -35,6 +35,7 @@ type Config struct {
 	PageSize      int
 	PrivacyUrl    string
 	TermsOfUseUrl string
+	Premium       bool
 	Consts        Constants
 	Prem          Premium
 }
