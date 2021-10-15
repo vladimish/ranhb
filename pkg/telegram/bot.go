@@ -5,6 +5,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/telf01/ranhb/pkg/configurator"
 	db2 "github.com/telf01/ranhb/pkg/db"
+	"github.com/telf01/yookassa-go-sdk"
 	"log"
 	"net/http"
 )
@@ -12,10 +13,11 @@ import (
 type Bot struct {
 	db  *db2.DataBase
 	bot *tgbotapi.BotAPI
+	kassa *yookassa.Kassa
 }
 
-func NewBot(bot *tgbotapi.BotAPI, db *db2.DataBase) *Bot {
-	return &Bot{bot: bot, db: db}
+func NewBot(bot *tgbotapi.BotAPI, db *db2.DataBase, kassa *yookassa.Kassa) *Bot {
+	return &Bot{bot: bot, db: db, kassa: kassa}
 }
 
 func (b *Bot) Start() error {

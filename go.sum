@@ -4,3 +4,5 @@ github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible h1:2cauKuaEL
 github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible/go.mod h1:qf9acutJ8cwBUhm1bqgz6Bei9/C/c93FPDljKWwsOgM=
 github.com/technoweenie/multipartstreamer v1.0.1 h1:XRztA5MXiR1TIRHxH2uNxXxaIkKQDeX7m2XsSOlQEnM=
 github.com/technoweenie/multipartstreamer v1.0.1/go.mod h1:jNVxdtShOxzAsukZwTSw6MDx5eUJoiEBsSvzDU9uzog=
+github.com/telf01/yookassa-go-sdk v0.0.0-20211014171523-8eb012d5e59c h1:OzDSWJ5QcGLwmIYbhJOXI0Z+eFgEAof0lYARlzch8+M=
+github.com/telf01/yookassa-go-sdk v0.0.0-20211014171523-8eb012d5e59c/go.mod h1:3H2PvqJ6E5mOMx5xVLoSzSxwwvD6iwzfOjHjpkTMhhE=

@@ -7,6 +7,7 @@ import (
 	"github.com/telf01/ranhb/pkg/db/models"
 	"github.com/telf01/ranhb/pkg/users"
 	"github.com/telf01/ranhb/pkg/utils/date"
+	"github.com/telf01/yookassa-go-sdk"
 	"log"
 	"strconv"
 	"strings"
@@ -187,7 +188,7 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 		}
 	case configurator.Cfg.Consts.ThisWeek:
 		isPremium, err := b.db.CheckPremiumStatus(user.U.Id)
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		if isPremium {
@@ -199,7 +200,7 @@ func (b *Bot) handleMenuMessage(message *tgbotapi.Message, user *users.User) err
 		}
 	case configurator.Cfg.Consts.NextWeek:
 		isPremium, err := b.db.CheckPremiumStatus(user.U.Id)
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		if isPremium {
@@ -252,7 +253,7 @@ func (b *Bot) handleSettingsMessage(message *tgbotapi.Message, user *users.User)
 		}
 	case configurator.Cfg.Consts.Info:
 		err := b.sendInfoMessage(user.U.Id)
-		if err != nil{
+		if err != nil {
 			return err
 		}
 	case configurator.Cfg.Consts.Premium:
@@ -269,13 +270,12 @@ func (b *Bot) sendInfoMessage(id int64) error {
 	text := "Ranh bot v1.0\n\nРазработано Владимиром Мишаковым\nПри поддержке Александра Тарасюка\n\nПо всем вопросам и предложением обращайтесь на 01.vladimir.mishakov@gmail.com или @telf01"
 	msg := tgbotapi.NewMessage(id, text)
 	m, err := b.bot.Send(msg)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	log.Println(m)
 	return nil
 }
-
 
 func (b *Bot) handleTeachersMessage(message *tgbotapi.Message, user *users.User) error {
 	switch message.Text {
@@ -473,7 +473,7 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 		}
 		if exists {
 			msg, err := b.buildTeacherTtMessage(message, user, time.Now())
-			if err != nil{
+			if err != nil {
 				return err
 			}
 
@@ -484,7 +484,7 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 			log.Println(m)
 
 			err = b.db.SaveTeacherCallback(message.Chat.ID, m.MessageID, time.Now().Day(), int(time.Now().Month()), message.Text)
-			if err != nil{
+			if err != nil {
 				return err
 			}
 		} else {
@@ -499,7 +499,7 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 	return nil
 }
 
-func (b *Bot) buildTeacherTtMessage(message *tgbotapi.Message, user *users.User, date time.Time) (*tgbotapi.MessageConfig ,error) {
+func (b *Bot) buildTeacherTtMessage(message *tgbotapi.Message, user *users.User, date time.Time) (*tgbotapi.MessageConfig, error) {
 	tts, err := b.db.GetTeachersLessons(message.Text, user.U.Group, date.Day(), int(date.Month()))
 	if err != nil {
 		return nil, err
@@ -536,14 +536,39 @@ func (b *Bot) handlePremiumMessage(message *tgbotapi.Message, user *users.User) 
 		if err != nil {
 			return err
 		}
+	case configurator.Cfg.Prem.Three:
+		err := b.sendBuyMessage(user, 3)
+		if err != nil {
+			return err
+		}
+	case configurator.Cfg.Prem.Six:
+		err := b.sendBuyMessage(user, 6)
+		if err != nil {
+			return err
+		}
+	case configurator.Cfg.Prem.Twelve:
+		err := b.sendBuyMessage(user, 12)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (b *Bot) sendBuyMessage(user *users.User, months int) error {
-	// TODO: GENERATING PAYMENT URL
-	url := "payment url"
+	pcfg := b.createPaymentConfig(user, months)
+	payment, err := b.kassa.SendPaymentConfig(pcfg)
+	if err != nil {
+		return err
+	}
+
+	err = b.db.SavePayment(*payment, user.U.Id)
+	if err != nil {
+		return err
+	}
+
+	url := "Заказа " + payment.Id + " создан. \nОплатите его по ссылке: " + fmt.Sprintf("%v", payment.Confirmation.(map[string]interface{})["confirmation_url"])
 
 	msg := tgbotapi.NewMessage(user.U.Id, url)
 
@@ -553,6 +578,29 @@ func (b *Bot) sendBuyMessage(user *users.User, months int) error {
 	}
 
 	log.Println("Message sent: ", message)
+
+	updatedPayment, err := b.CheckPaymentUpdates(100, time.Second*10, payment.Id)
+	if err != nil {
+		log.Println("[ERROR] PAYMENT" + payment.Id + "FAILED")
+		errorMessage := tgbotapi.NewMessage(user.U.Id, "Произошла ошибка при оплате заказа "+payment.Id+". В случае, если заказ был оплачен, свяжитесь с нами по адресу, указанному в справочной информации и укажите в письме номер заказа.")
+		_, err = b.bot.Send(errorMessage)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	if updatedPayment.Status == yookassa.Succeeded {
+		log.Printf("User %d bought %s\n", user.U.Id, payment.Description)
+		err = b.db.AddPremium(user.U.Id, time.Hour*24*31*time.Duration(months))
+		if err != nil {
+			log.Println(err)
+		}
+		successMessage := tgbotapi.NewMessage(user.U.Id, "Платёж прошёл успешно!")
+		msg, err := b.bot.Send(successMessage)
+		if err != nil{
+			return err
+		}
+		log.Println(msg)
+	}
 
 	return nil
 }

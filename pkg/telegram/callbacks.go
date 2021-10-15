@@ -247,16 +247,18 @@ func (b *Bot) generateTtCallbackMessage(message *tgbotapi.Message, user *users.U
 		fullMsgString += "Занятий нет."
 	}
 
-	if len(fullMsgString) > 4096 {
-		tempStr := []rune(fullMsgString)
-		fullMsgString = string(tempStr[4095:])
-		msg := tgbotapi.NewMessage(message.Chat.ID, string(tempStr[:4095]))
-		msg.ParseMode = "HTML"
-		_, err := b.bot.Send(msg)
-		if err != nil {
-			return err
-		}
-	}
+	// TODO: fix this....
+	//if len(fullMsgString) > 4096 {
+	//	log.Println(len(fullMsgString))
+	//	tempStr := []rune(fullMsgString)
+	//	fullMsgString = string(tempStr[4095:])
+	//	msg := tgbotapi.NewMessage(message.Chat.ID, string(tempStr[:4095]))
+	//	msg.ParseMode = "HTML"
+	//	_, err := b.bot.Send(msg)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 
 	// Make message config.
 	msg := tgbotapi.NewMessage(message.Chat.ID, fullMsgString)

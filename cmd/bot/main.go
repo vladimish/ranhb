@@ -5,6 +5,7 @@ import (
 	"github.com/telf01/ranhb/pkg/configurator"
 	"github.com/telf01/ranhb/pkg/db"
 	"github.com/telf01/ranhb/pkg/telegram"
+	"github.com/telf01/yookassa-go-sdk"
 	"log"
 )
 
@@ -22,7 +23,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	telegramBot := telegram.NewBot(bot, botDB)
+	kassa := yookassa.NewKassa(configurator.Cfg.ShopID, configurator.Cfg.ShopToken)
+	result, err := kassa.Ping()
+	if !result || err != nil {
+		log.Fatal("Can't ping kassa", err)
+	}
+
+	telegramBot := telegram.NewBot(bot, botDB, kassa)
 
 	if err := telegramBot.Start(); err != nil {
 		log.Fatal(err)

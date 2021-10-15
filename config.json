@@ -5,13 +5,15 @@
   "DbUrl": "localhost",
   "DbPort": "3306",
   "DbLogin": "mysql",
-  "DbPassword": "",
+  "DbPassword": "mysql",
+  "ShopID": "",
+  "ShopToken": "",
   "TgKey": "",
   "TimeZone": "UTC+3",
   "PageSize": 50,
   "PrivacyUrl": "https://docs.google.com/document/d/1dg7pPxVwvhmmwsMaaXYKNmliz15_q2JXdAm1a7c7-YU",
   "TermsOfUseUrl": "https://docs.google.com/document/d/1IUpduxboWRdY2EJ6aFApI64Zuz23KG3HbriLbJSs6BA",
-  "Premium": false,
+  "Premium": true,
   "Consts": {
     "Right": "➡",
     "Left": "⬅",
@@ -30,7 +32,13 @@
     "One": "1 Месяц - 49 руб.",
     "Three": "3 Месяца - 129 руб.",
     "Six": "6 Месяцев - 249 руб.",
-    "Twelve": "1 Год - 499 руб.",
+    "Twelve": "1 Год - 449 руб.",
     "Cancel": "Отменить подписку"
+  },
+  "Prices": {
+    "One": 49,
+    "Three": 129,
+    "Six": 249,
+    "Twelve": 449
   }
 }

@@ -30,6 +30,8 @@ type Config struct {
 	DbPort        string
 	DbLogin       string
 	DbPassword    string
+	ShopID		  string
+	ShopToken     string
 	TgKey         string
 	TimeZone      string
 	PageSize      int
@@ -38,6 +40,14 @@ type Config struct {
 	Premium       bool
 	Consts        Constants
 	Prem          Premium
+	Prices 		  Prices
+}
+
+type Prices struct {
+	One    int
+	Three  int
+	Six    int
+	Twelve int
 }
 
 type Premium struct {
