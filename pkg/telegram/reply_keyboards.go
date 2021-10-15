@@ -47,16 +47,17 @@ func (b *Bot) buildPremiumKeyboard(isPremium bool) *tgbotapi.ReplyKeyboardMarkup
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Prem.Twelve),
 	)
 	row3 := tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton(configurator.Cfg.Prem.Cancel),
+		tgbotapi.NewKeyboardButton("Ваша подписка активна."),
 	)
 	row4 := tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton(configurator.Cfg.Consts.Left),
 	)
 
-	buttons = append(buttons, row1)
-	buttons = append(buttons, row2)
 	if isPremium {
 		buttons = append(buttons, row3)
+	} else {
+		buttons = append(buttons, row1)
+		buttons = append(buttons, row2)
 	}
 	buttons = append(buttons, row4)
 	keyboard := tgbotapi.NewReplyKeyboard(buttons...)
