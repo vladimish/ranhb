@@ -267,8 +267,10 @@ func (b *Bot) handleSettingsMessage(message *tgbotapi.Message, user *users.User)
 }
 
 func (b *Bot) sendInfoMessage(id int64) error {
-	text := "Ranh bot v1.0\n\nРазработано Владимиром Мишаковым\nПри поддержке Александра Тарасюка\n\nПо всем вопросам и предложением обращайтесь на 01.vladimir.mishakov@gmail.com или @telf01"
+	text := "Ranh bot v1.0\n\nРазработано Владимиром Мишаковым\nПри поддержке Александра Тарасюка и сообщества <a href=\"https://vk.com/prpdvch\">преподавач</a>\n\nПо всем вопросам и предложением обращайтесь на 01.vladimir.mishakov@gmail.com или @telf01"
 	msg := tgbotapi.NewMessage(id, text)
+	msg.DisableWebPagePreview = true
+	msg.ParseMode = "HTML"
 	m, err := b.bot.Send(msg)
 	if err != nil {
 		return err
@@ -300,7 +302,10 @@ func (b *Bot) handleTeachersMessage(message *tgbotapi.Message, user *users.User)
 			msg.Text = "Выберите преподавателя из списка"
 			msg.ReplyMarkup = b.buildTeachersKeyboard(teachers)
 			user.U.LastAction = "teachers_selection"
-			user.Save()
+			err = user.Save()
+			if err != nil{
+				return err
+			}
 		} else {
 			msg.Text = "Преподаватель не найден"
 		}
@@ -489,7 +494,10 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 			}
 		} else {
 			user.U.LastAction = "teachers"
-			user.Save()
+			err = user.Save()
+			if err != nil{
+				return err
+			}
 			err := b.handleTeachersMessage(message, user)
 			if err != nil {
 				return err

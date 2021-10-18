@@ -180,7 +180,11 @@ func (b *Bot) buildTeachersKeyboard(teachers []string) *tgbotapi.ReplyKeyboardMa
 func (b *Bot) sendSettingsKeyboard(user *users.User) error {
 	user.U.LastAction = "settings"
 	user.U.LastActionValue = 0
-	user.Save()
+	err := user.Save()
+	if err != nil {
+		return err
+	}
+
 	settingsKeyboard := b.buildSettingsKeyboard()
 	msg := tgbotapi.NewMessage(user.U.Id, configurator.Cfg.Consts.Settings)
 	msg.ReplyMarkup = settingsKeyboard

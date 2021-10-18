@@ -7,4 +7,7 @@ type User struct {
 	LastActionValue      int
 	IsPrivacyAccepted    bool
 	IsTermsOfUseAccepted bool
+	RegisterTime         int64
+	LastActionTime       int64
+	ActionsAmount        int
 }

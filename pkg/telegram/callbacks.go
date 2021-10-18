@@ -52,11 +52,17 @@ func (b *Bot) handlePrivacyCallback(query *tgbotapi.CallbackQuery) error {
 
 	if query.Data == acceptString {
 		user.U.IsPrivacyAccepted = true
-		user.Save()
+		err = user.Save()
+		if err != nil{
+			return err
+		}
 		b.handleStartCommand(query.Message.Chat.ID)
 	} else {
 		user.U.IsPrivacyAccepted = false
-		user.Save()
+		err = user.Save()
+		if err != nil{
+			return err
+		}
 	}
 
 	err = b.answerToCallback(query.ID, "OK")
