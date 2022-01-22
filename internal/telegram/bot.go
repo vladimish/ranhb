@@ -3,8 +3,8 @@ package telegram
 import (
 	"errors"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/vladimish/ranhb/pkg/configurator"
-	db2 "github.com/vladimish/ranhb/pkg/db"
+	"github.com/vladimish/ranhb/internal/configurator"
+	db2 "github.com/vladimish/ranhb/internal/db"
 	"github.com/vladimish/yookassa-go-sdk"
 	"log"
 	"net/http"

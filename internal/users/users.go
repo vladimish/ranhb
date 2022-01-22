@@ -2,8 +2,8 @@ package users
 
 import (
 	_ "database/sql"
-	"github.com/vladimish/ranhb/pkg/db"
-	"github.com/vladimish/ranhb/pkg/users/models"
+	"github.com/vladimish/ranhb/internal/db"
+	"github.com/vladimish/ranhb/internal/users/models"
 )
 
 type User struct {

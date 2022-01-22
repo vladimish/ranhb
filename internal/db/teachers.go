@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"github.com/vladimish/ranhb/pkg/db/models"
+	"github.com/vladimish/ranhb/internal/db/models"
 )
 
 func (d *DataBase) GetTeachers(lastname string) ([]string, error) {

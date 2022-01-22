@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"github.com/vladimish/ranhb/pkg/configurator"
+	"github.com/vladimish/ranhb/internal/configurator"
 	"log"
 	"time"
 )

@@ -3,8 +3,8 @@ package telegram
 import (
 	"errors"
 	"fmt"
-	"github.com/vladimish/ranhb/pkg/configurator"
-	"github.com/vladimish/ranhb/pkg/users"
+	"github.com/vladimish/ranhb/internal/configurator"
+	"github.com/vladimish/ranhb/internal/users"
 	"github.com/vladimish/yookassa-go-sdk"
 	"log"
 	"time"

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/vladimish/ranhb/pkg/configurator"
+	"github.com/vladimish/ranhb/internal/configurator"
 )
 
 type DataBase struct {
