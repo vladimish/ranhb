@@ -2,8 +2,8 @@ package users
 
 import (
 	_ "database/sql"
-	"github.com/telf01/ranhb/pkg/db"
-	"github.com/telf01/ranhb/pkg/users/models"
+	"github.com/vladimish/ranhb/pkg/db"
+	"github.com/vladimish/ranhb/pkg/users/models"
 )
 
 type User struct {
@@ -38,7 +38,7 @@ func (u *User) Init(id int64, db *db.DataBase) error {
 	u = NewUser(id, db)
 	u.U.LastAction = "start"
 	err := u.Save()
-	if err != nil{
+	if err != nil {
 		return err
 	}
 

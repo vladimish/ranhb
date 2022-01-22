@@ -3,16 +3,16 @@ package telegram
 import (
 	"errors"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/telf01/ranhb/pkg/configurator"
-	db2 "github.com/telf01/ranhb/pkg/db"
-	"github.com/telf01/yookassa-go-sdk"
+	"github.com/vladimish/ranhb/pkg/configurator"
+	db2 "github.com/vladimish/ranhb/pkg/db"
+	"github.com/vladimish/yookassa-go-sdk"
 	"log"
 	"net/http"
 )
 
 type Bot struct {
-	db  *db2.DataBase
-	bot *tgbotapi.BotAPI
+	db    *db2.DataBase
+	bot   *tgbotapi.BotAPI
 	kassa *yookassa.Kassa
 }
 

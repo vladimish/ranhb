@@ -3,8 +3,8 @@ package telegram
 import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/telf01/ranhb/pkg/configurator"
-	"github.com/telf01/ranhb/pkg/users"
+	"github.com/vladimish/ranhb/pkg/configurator"
+	"github.com/vladimish/ranhb/pkg/users"
 	"log"
 )
 

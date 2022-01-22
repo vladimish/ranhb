@@ -2,10 +2,10 @@ package main
 
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/telf01/ranhb/pkg/configurator"
-	"github.com/telf01/ranhb/pkg/db"
-	"github.com/telf01/ranhb/pkg/telegram"
-	"github.com/telf01/yookassa-go-sdk"
+	"github.com/vladimish/ranhb/pkg/configurator"
+	"github.com/vladimish/ranhb/pkg/db"
+	"github.com/vladimish/ranhb/pkg/telegram"
+	"github.com/vladimish/yookassa-go-sdk"
 	"log"
 )
 

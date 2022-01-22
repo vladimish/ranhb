@@ -2,10 +2,10 @@ package telegram
 
 import (
 	"errors"
-	"github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/telf01/ranhb/pkg/configurator"
-	"github.com/telf01/ranhb/pkg/users"
-	"github.com/telf01/ranhb/pkg/utils/date"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/vladimish/ranhb/pkg/configurator"
+	"github.com/vladimish/ranhb/pkg/users"
+	"github.com/vladimish/ranhb/pkg/utils/date"
 	"log"
 	"strconv"
 	"strings"
@@ -53,14 +53,14 @@ func (b *Bot) handlePrivacyCallback(query *tgbotapi.CallbackQuery) error {
 	if query.Data == acceptString {
 		user.U.IsPrivacyAccepted = true
 		err = user.Save()
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		b.handleStartCommand(query.Message.Chat.ID)
 	} else {
 		user.U.IsPrivacyAccepted = false
 		err = user.Save()
-		if err != nil{
+		if err != nil {
 			return err
 		}
 	}
@@ -327,18 +327,18 @@ func (b *Bot) handleTeachersCallback(query *tgbotapi.CallbackQuery, queryType st
 	editedText.ParseMode = "HTML"
 
 	err = b.db.UpdateCallback(query.Message.Chat.ID, query.Message.MessageID, targetDate.Day(), int(targetDate.Month()))
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
 	m, err := b.bot.Send(editedText)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	log.Println(m)
 
 	m, err = b.bot.Send(editedMarkup)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 

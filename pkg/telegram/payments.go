@@ -3,9 +3,9 @@ package telegram
 import (
 	"errors"
 	"fmt"
-	"github.com/telf01/ranhb/pkg/configurator"
-	"github.com/telf01/ranhb/pkg/users"
-	"github.com/telf01/yookassa-go-sdk"
+	"github.com/vladimish/ranhb/pkg/configurator"
+	"github.com/vladimish/ranhb/pkg/users"
+	"github.com/vladimish/yookassa-go-sdk"
 	"log"
 	"time"
 )

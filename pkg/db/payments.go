@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"github.com/telf01/yookassa-go-sdk"
+	"github.com/vladimish/yookassa-go-sdk"
 	"log"
 	"time"
 )

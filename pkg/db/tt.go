@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"github.com/telf01/ranhb/pkg/db/models"
+	"github.com/vladimish/ranhb/pkg/db/models"
 	"log"
 )
 

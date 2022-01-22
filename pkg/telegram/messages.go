@@ -3,11 +3,11 @@ package telegram
 import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/telf01/ranhb/pkg/configurator"
-	"github.com/telf01/ranhb/pkg/db/models"
-	"github.com/telf01/ranhb/pkg/users"
-	"github.com/telf01/ranhb/pkg/utils/date"
-	"github.com/telf01/yookassa-go-sdk"
+	"github.com/vladimish/ranhb/pkg/configurator"
+	"github.com/vladimish/ranhb/pkg/db/models"
+	"github.com/vladimish/ranhb/pkg/users"
+	"github.com/vladimish/ranhb/pkg/utils/date"
+	"github.com/vladimish/yookassa-go-sdk"
 	"log"
 	"strconv"
 	"strings"
@@ -267,7 +267,7 @@ func (b *Bot) handleSettingsMessage(message *tgbotapi.Message, user *users.User)
 }
 
 func (b *Bot) sendInfoMessage(id int64) error {
-	text := "Ranh bot v1.0\n\nРазработано Владимиром Мишаковым\nПри поддержке Александра Тарасюка и сообщества <a href=\"https://vk.com/prpdvch\">преподавач</a>\n\nПо всем вопросам и предложением обращайтесь на 01.vladimir.mishakov@gmail.com или @telf01"
+	text := "Ranh bot v1.0\n\nРазработано Владимиром Мишаковым\nПри поддержке Александра Тарасюка и сообщества <a href=\"https://vk.com/prpdvch\">преподавач</a>\n\nПо всем вопросам и предложением обращайтесь на 01.vladimir.mishakov@gmail.com или @vladimish"
 	msg := tgbotapi.NewMessage(id, text)
 	msg.DisableWebPagePreview = true
 	msg.ParseMode = "HTML"
@@ -303,7 +303,7 @@ func (b *Bot) handleTeachersMessage(message *tgbotapi.Message, user *users.User)
 			msg.ReplyMarkup = b.buildTeachersKeyboard(teachers)
 			user.U.LastAction = "teachers_selection"
 			err = user.Save()
-			if err != nil{
+			if err != nil {
 				return err
 			}
 		} else {
@@ -495,7 +495,7 @@ func (b *Bot) handleTeacherSelectionMessage(message *tgbotapi.Message, user *use
 		} else {
 			user.U.LastAction = "teachers"
 			err = user.Save()
-			if err != nil{
+			if err != nil {
 				return err
 			}
 			err := b.handleTeachersMessage(message, user)
@@ -604,7 +604,7 @@ func (b *Bot) sendBuyMessage(user *users.User, months int) error {
 		}
 		successMessage := tgbotapi.NewMessage(user.U.Id, "Платёж прошёл успешно!")
 		msg, err := b.bot.Send(successMessage)
-		if err != nil{
+		if err != nil {
 			return err
 		}
 		log.Println(msg)

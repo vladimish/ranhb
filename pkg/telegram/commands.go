@@ -2,7 +2,7 @@ package telegram
 
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/telf01/ranhb/pkg/users"
+	"github.com/vladimish/ranhb/pkg/users"
 	"strings"
 )
 
@@ -60,7 +60,6 @@ func (b *Bot) handleStartCommand(id int64) error {
 
 	return b.sendGroupsKeyboard(id, user, 0)
 }
-
 
 func (b *Bot) handleAllCommand(msg tgbotapi.MessageConfig) error {
 	groups, err := b.db.GetAllDistinctField("groups", "tt", "0", " 100")
